@@ -80,6 +80,9 @@
   .room-bar .in-room-only { display: none; gap: .5rem; align-items: center; }
   .room-bar.in-room .join-only { display: none; }
   .room-bar.in-room .in-room-only { display: inline-flex; }
+  .room-bar .identity { display: inline-flex; align-items: center; gap: .35rem; }
+  .room-bar .identity label { font-size: .85rem; font-weight: bold; opacity: .8; }
+  .room-bar .identity input { text-transform: none; letter-spacing: normal; width: 8.5rem; }
 
   .add-panel {
     background: rgba(107,58,107,.06); border: 1px solid var(--accent-soft);
@@ -182,6 +185,10 @@
   <div class="room-bar" id="roomBar">
     <span class="status" id="roomStatus"><span class="dot"></span>Local table &mdash; only on this device</span>
     <span class="spacer"></span>
+    <span class="identity">
+      <label for="nameInput">You:</label>
+      <input id="nameInput" placeholder="Your name" maxlength="24" autocomplete="off">
+    </span>
     <span class="join-only">
       <button class="btn small" id="createRoomBtn">Create room</button>
       <input id="joinInput" placeholder="Room code" maxlength="12">
@@ -232,8 +239,9 @@
 const SUPABASE_URL = "https://wbrfqsxsfcfijphlaiye.supabase.co";
 const SUPABASE_KEY = "sb_publishable_xN88kgc3CLZJGIiAKK03cw_VAVSICqS";
 
-const LOCAL_KEY = "tott-table";   // local-only mode storage
-const ROOM_KEY  = "tott-room";    // last joined room code
+const LOCAL_KEY  = "tott-table";   // local-only mode storage
+const ROOM_KEY   = "tott-room";    // last joined room code
+const PLAYER_KEY = "tott-player";  // this device's display name
 const GUTENDEX  = "https://gutendex.com/books";
 // A curated pool of weird & wonderful public-domain Tomes for "Surprise me"
 const POOL = [1342, 84, 2701, 345, 1661, 11, 1232, 2542, 76, 174, 5200, 1184, 98,
@@ -252,11 +260,26 @@ try {
 let table = [];      // [{ gutenberg_id, title, author, cover, url, stolenBy }]
 let room = null;     // current room code (null = local mode)
 let channel = null;  // realtime subscription
+let playerName = (localStorage.getItem(PLAYER_KEY) || "").trim();  // this device's identity
 
 const pileEl = document.getElementById("pile");
 const msgEl  = document.getElementById("msg");
+const nameInput = document.getElementById("nameInput");
 
 function setMsg(text, isErr) { msgEl.textContent = text || ""; msgEl.classList.toggle("err", !!isErr); }
+
+function setPlayerName(v) {
+  playerName = (v || "").trim();
+  if (playerName) localStorage.setItem(PLAYER_KEY, playerName);
+  else localStorage.removeItem(PLAYER_KEY);
+  if (nameInput.value !== playerName) nameInput.value = playerName;
+}
+nameInput.value = playerName;
+nameInput.addEventListener("input", () => {
+  playerName = nameInput.value.trim();
+  if (playerName) localStorage.setItem(PLAYER_KEY, playerName);
+  else localStorage.removeItem(PLAYER_KEY);
+});
 function inRoom() { return !!(room && sb); }
 
 function parseId(input) {
@@ -457,9 +480,16 @@ function render() {
       const steal = document.createElement("button");
       steal.className = "btn small"; steal.textContent = "Steal";
       steal.addEventListener("click", () => {
-        const who = prompt("Which thief steals “" + bk.title + "”?\n(Enter a player name, or leave blank.)");
-        if (who === null) return;
-        opSteal(bk, who.trim() || "a thief");
+        let who = playerName;
+        if (!who) {
+          // No identity set yet — ask once and remember it as this device's name.
+          const entered = prompt("Set your name (you'll be identified by this when you steal):");
+          if (entered === null) return;
+          who = entered.trim();
+          if (!who) { setMsg("Enter a name in the “You:” box first, then steal.", true); nameInput.focus(); return; }
+          setPlayerName(who);
+        }
+        opSteal(bk, who);
       });
       actions.appendChild(steal);
     }
