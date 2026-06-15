@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thieves of the Tome — GM Module</title>
+<style>
+  :root {
+    --ink: #1c1a17;
+    --parchment: #f4ecd8;
+    --line: #b8a983;
+    --accent: #6b4f2a;        /* bronze — the GM's module sheet */
+    --accent-soft: #9a7c4a;
+    --gold: #b8860b;
+    --stolen: #7a2d2d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 2rem 1rem 4rem;
+    font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    color: var(--ink);
+    background: var(--parchment);
+    background-image: radial-gradient(circle at 20% 0%, #fff8e9 0%, transparent 60%),
+                      radial-gradient(circle at 80% 100%, #efe3c4 0%, transparent 55%);
+  }
+  .sheet { max-width: 980px; margin: 0 auto; }
+
+  .site-nav {
+    display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center;
+    margin: 0 auto 1.5rem; max-width: 980px;
+  }
+  .site-nav a {
+    font-size: .85rem; text-decoration: none; color: var(--ink);
+    opacity: .65; padding: .3rem .85rem; border-radius: 999px; border: 1px solid transparent;
+  }
+  .site-nav a:hover { opacity: 1; background: rgba(0,0,0,.05); }
+  .site-nav a.active {
+    opacity: 1; font-weight: bold; color: var(--accent, var(--ink));
+    border-color: var(--accent, var(--line));
+  }
+
+  header.title {
+    text-align: center; border-bottom: 3px double var(--accent);
+    padding-bottom: .75rem; margin-bottom: 1.25rem;
+  }
+  header.title h1 { margin: 0; font-size: 2.1rem; letter-spacing: 1px; color: var(--accent); text-transform: uppercase; }
+  header.title p { margin: .25rem 0 0; font-style: italic; opacity: .8; }
+
+  .secret {
+    text-align: center; font-style: italic; color: var(--accent);
+    background: rgba(107,79,42,.08); border: 1px dashed var(--accent-soft);
+    border-radius: 6px; padding: .5rem .75rem; margin-bottom: 1.25rem; font-size: .9rem;
+  }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; justify-content: center; margin-bottom: 1.5rem; }
+  .btn {
+    border: 2px solid var(--accent); background: var(--parchment); color: var(--accent);
+    padding: .35rem .9rem; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: .9rem;
+  }
+  .btn:hover { background: var(--accent); color: var(--parchment); }
+  .btn.small { padding: .22rem .6rem; font-size: .8rem; border-width: 1px; }
+  .btn.ghost { border-style: dashed; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn:disabled:hover { background: var(--parchment); color: var(--accent); }
+
+  .room-bar {
+    display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
+    background: rgba(107,79,42,.07); border: 1px solid var(--accent-soft);
+    border-radius: 10px; padding: .6rem .8rem; margin-bottom: .5rem;
+  }
+  .room-bar .status { font-size: .9rem; display: flex; align-items: center; }
+  .room-bar .status b { color: var(--accent); letter-spacing: 1px; }
+  .room-bar .dot { width: .6rem; height: .6rem; border-radius: 50%; background: #9a9a9a; display: inline-block; margin-right: .45rem; }
+  .room-bar.in-room .dot { background: #2e8b57; box-shadow: 0 0 5px #2e8b57; }
+  .room-bar .spacer { flex: 1; }
+  .room-bar input {
+    font-family: inherit; font-size: .9rem; text-transform: uppercase; letter-spacing: 1px;
+    border: 1.5px solid var(--line); border-radius: 6px; padding: .3rem .5rem; width: 8rem;
+    background: var(--parchment); color: var(--ink); outline: none;
+  }
+  .room-bar input:focus { border-color: var(--accent); background: #fffdf6; }
+  .room-bar .join-only { display: inline-flex; gap: .5rem; align-items: center; }
+  .room-bar .in-room-only { display: none; gap: .5rem; align-items: center; }
+  .room-bar.in-room .join-only { display: none; }
+  .room-bar.in-room .in-room-only { display: inline-flex; }
+  .share-status { font-size: .82rem; opacity: .85; margin-bottom: 1.25rem; min-height: 1.1rem; }
+  .share-status a { color: var(--accent); }
+
+  section.block {
+    background: rgba(255,255,255,.4); border: 1px solid var(--line);
+    border-left: 5px solid var(--accent); border-radius: 8px;
+    padding: 1rem 1.25rem 1.25rem; margin-bottom: 1.25rem;
+  }
+  section.block > h2 { margin: 0 0 .15rem; font-size: 1.15rem; color: var(--accent); display: flex; align-items: baseline; gap: .5rem; }
+  section.block > h2 .step { font-size: .72rem; background: var(--accent); color: var(--parchment); border-radius: 4px; padding: .05rem .45rem; }
+  .hint { font-size: .82rem; font-style: italic; opacity: .75; margin: .1rem 0 .9rem; line-height: 1.4; }
+
+  label.fld { display: block; font-weight: bold; font-size: .82rem; margin-bottom: .2rem; }
+  input[type=text], textarea {
+    width: 100%; font-family: inherit; font-size: 1rem; color: var(--ink);
+    background: var(--parchment); border: 1.5px solid var(--line); border-radius: 6px;
+    padding: .4rem .55rem; outline: none;
+  }
+  input[type=text]:focus, textarea:focus { border-color: var(--accent); background: #fffdf6; }
+  textarea { resize: vertical; min-height: 3rem; }
+  .row { margin-bottom: .85rem; }
+  .row:last-child { margin-bottom: 0; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+  /* overt/covert toggle */
+  .switch { display: inline-flex; border: 2px solid var(--accent); border-radius: 999px; overflow: hidden; }
+  .switch button { border: 0; padding: .3rem 1rem; background: transparent; cursor: pointer; font-family: inherit; font-size: .9rem; color: var(--accent); }
+  .switch button.on { background: var(--accent); color: var(--parchment); }
+
+  /* example chips */
+  .chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .4rem; }
+  .chips .lbl { font-size: .75rem; opacity: .6; align-self: center; }
+  .chip {
+    font-size: .78rem; border: 1px solid var(--accent-soft); color: var(--accent);
+    background: rgba(107,79,42,.06); border-radius: 999px; padding: .12rem .55rem; cursor: pointer;
+  }
+  .chip:hover { background: var(--accent); color: var(--parchment); }
+
+  /* palette */
+  .palette { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .pal-col h3 { margin: 0 0 .15rem; font-size: .95rem; color: var(--accent); }
+  .pal-col .col-hint { font-size: .74rem; opacity: .65; font-style: italic; margin: 0 0 .5rem; min-height: 2.2rem; }
+  .pal-rows { display: flex; flex-direction: column; gap: .4rem; }
+  .pal-line { display: flex; gap: .3rem; align-items: center; }
+  .pal-line input { font-size: .88rem; padding: .3rem .45rem; }
+  .pal-line .arrow { opacity: .5; font-size: .85rem; }
+  .pal-line .del { flex: 0 0 auto; width: 1.4rem; height: 1.4rem; border: 0; background: transparent; color: var(--stolen); cursor: pointer; font-size: 1rem; opacity: .5; }
+  .pal-line .del:hover { opacity: 1; }
+  .golden { font-size: .82rem; background: rgba(107,79,42,.07); border-radius: 6px; padding: .5rem .7rem; margin-top: .85rem; }
+  .golden b { color: var(--accent); }
+
+  /* antagonists */
+  .antag { background: rgba(255,255,255,.5); border: 1px solid var(--line); border-radius: 8px; padding: .8rem .9rem; margin-bottom: .8rem; position: relative; }
+  .antag .ant-head { display: flex; gap: .5rem; align-items: center; margin-bottom: .55rem; }
+  .antag .ant-head input { font-weight: bold; }
+  .antag .ant-del { flex: 0 0 auto; border: 1px solid var(--stolen); color: var(--stolen); background: transparent; border-radius: 5px; font-size: .75rem; padding: .12rem .5rem; cursor: pointer; }
+  .antag .ant-del:hover { background: var(--stolen); color: #fff; }
+  .antag .power { display: grid; grid-template-columns: 1fr 1.6fr; gap: .5rem; margin-top: .5rem; }
+  .antag .power-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; opacity: .55; font-weight: bold; grid-column: 1 / -1; margin-bottom: -.25rem; }
+
+  footer.legal { text-align: center; font-size: .75rem; opacity: .6; margin-top: 2rem; }
+
+  @media print {
+    body { background: #fff; padding: 0; }
+    .site-nav, .toolbar, .btn, .chips, .secret, .room-bar, .share-status, .pal-line .del, .ant-del { display: none; }
+    section.block { break-inside: avoid; }
+    input, textarea { background: #fff; }
+  }
+  @media (max-width: 720px) {
+    .palette { grid-template-columns: 1fr; }
+    .two-col { grid-template-columns: 1fr; }
+    .antag .power { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <nav class="site-nav">
+    <a href="index.html">Home</a>
+    <a href="tome-spellsheet.html">Spellsheet</a>
+    <a href="the-table.html">The Table</a>
+    <a href="thief-character-sheet.html">Thief Sheet</a>
+    <a href="gm-library.html">GM Library</a>
+    <a href="gm-module.html" class="active" aria-current="page">GM Module</a>
+  </nav>
+
+  <header class="title">
+    <h1>GM Module</h1>
+    <p>Embody Na'zar &mdash; Build the Tomeality</p>
+  </header>
+
+  <div class="secret">
+    &#128064; For the Game Master. Build this from <em>your</em> book while the players write spells and make thieves.
+    Introduce the Tomeality and Escape Condition aloud; keep the rest as your reference.
+  </div>
+
+  <div class="room-bar" id="roomBar">
+    <span class="status" id="roomStatus"><span class="dot"></span>Working locally</span>
+    <span class="spacer"></span>
+    <span class="join-only">
+      <button class="btn small" id="createRoomBtn">Create room</button>
+      <input id="joinInput" placeholder="Room code" maxlength="12">
+      <button class="btn small" id="joinRoomBtn">Join</button>
+    </span>
+    <span class="in-room-only">
+      <button class="btn small" id="shareBtn">Share to room</button>
+      <button class="btn small" id="copyLinkBtn">Copy invite</button>
+      <button class="btn small" id="leaveRoomBtn">Leave</button>
+    </span>
+  </div>
+  <div class="share-status" id="shareStatus"></div>
+
+  <div class="toolbar">
+    <button class="btn" id="presetBtn" title="Fill in the recommended first-game module (The Direct Pursuit)">First-game preset</button>
+    <button class="btn" id="saveBtn">Save</button>
+    <button class="btn" id="loadBtn">Load</button>
+    <button class="btn" id="clearBtn">Clear</button>
+    <button class="btn" onclick="window.print()">Print</button>
+  </div>
+
+  <div class="row" style="margin-bottom:1.25rem">
+    <label class="fld" for="tomeTitle">Your Tome (the GM's book)</label>
+    <input type="text" id="tomeTitle" placeholder="The book you brought to run the game">
+  </div>
+
+  <!-- 1. Tomeality -->
+  <section class="block">
+    <h2><span class="step">1</span> The Tomeality</h2>
+    <p class="hint">The setting, drawn from your book. Answer four questions.</p>
+
+    <div class="two-col">
+      <div class="row">
+        <label class="fld" for="genre">Core genre of the world</label>
+        <input type="text" id="genre" placeholder="A couple words — e.g. sci-fi, fabricpunk fantasy">
+      </div>
+      <div class="row">
+        <label class="fld">Is magic overt or covert?</label>
+        <div class="switch" id="magicSwitch">
+          <button type="button" data-magic="overt" class="on">Overt</button>
+          <button type="button" data-magic="covert">Covert</button>
+        </div>
+        <p class="hint" style="margin:.35rem 0 0">Overt: everyone knows magic is real (often fantasy). Covert: the White Guard hide it (often cyberpunk).</p>
+      </div>
+    </div>
+
+    <div class="row">
+      <label class="fld" for="whiteGuard">What is the White Guard like?</label>
+      <textarea id="whiteGuard" rows="2" placeholder="A sentence or two — their class, goals, whether they rule openly or in secret"></textarea>
+      <div class="chips" data-target="whiteGuard">
+        <span class="lbl">Examples:</span>
+        <span class="chip">The royal family of England seeking to live forever.</span>
+        <span class="chip">A megacorp fixated on profit margins and commodifying magic.</span>
+        <span class="chip">A secretive sect aiming to control world affairs.</span>
+        <span class="chip">An artisan guild that only accepts the best of the best.</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <label class="fld" for="library">What is the Library of Na'zar like?</label>
+      <textarea id="library" rows="2" placeholder="A sentence or two — the building, its defenses, what's unique about it"></textarea>
+      <div class="chips" data-target="library">
+        <span class="lbl">Examples:</span>
+        <span class="chip">A hollowed-out mushroom rife with rabid worshipers.</span>
+        <span class="chip">A mech palace that cannot be reached from the ground.</span>
+        <span class="chip">A moonbase only accessible by rocket.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Escape Condition -->
+  <section class="block">
+    <h2><span class="step">2</span> Escape Condition</h2>
+    <p class="hint">One sentence describing what the thieves must do to escape, built from the last pages of your book. Aim for at least 3 explicit steps; don't make any single step too hard.</p>
+    <textarea id="escape" rows="2" placeholder="The thieves will escape when they reach [location] with [stealable item] and [stealable item]."></textarea>
+  </section>
+
+  <!-- 3. Palette -->
+  <section class="block">
+    <h2><span class="step">3</span> The Palette</h2>
+    <p class="hint">Flip to random pages and jot 3&ndash;4 entries per column. You'll discover their meaning as you play.</p>
+    <div class="palette">
+      <div class="pal-col">
+        <h3>Locations</h3>
+        <p class="col-hint">Places a scene might happen.</p>
+        <div class="pal-rows" id="locations"></div>
+        <button class="btn small ghost" data-add="locations">+ location</button>
+      </div>
+      <div class="pal-col">
+        <h3>Obstacles</h3>
+        <p class="col-hint">Object/situation &rarr; a mostly negative effect.</p>
+        <div class="pal-rows" id="obstacles"></div>
+        <button class="btn small ghost" data-add="obstacles">+ obstacle</button>
+      </div>
+      <div class="pal-col">
+        <h3>Actions</h3>
+        <p class="col-hint">A verb &rarr; an effect an NPC can inflict.</p>
+        <div class="pal-rows" id="actions"></div>
+        <button class="btn small ghost" data-add="actions">+ action</button>
+      </div>
+    </div>
+    <p class="golden">Golden rule when stuck: the thieves' goal is at a <b>location</b>, but an <b>obstacle</b> stands in the way, and an antagonist is using an <b>action</b> to stop them.</p>
+  </section>
+
+  <!-- 4. Antagonists -->
+  <section class="block">
+    <h2><span class="step">4</span> Antagonists</h2>
+    <p class="hint">1&ndash;3 servants of the White Guard, each with a description and at least one magical power. (Robes can read magic, never exhaust spells, and memorize them.)</p>
+    <div id="antagonists"></div>
+    <button class="btn small ghost" id="addAntag">+ antagonist</button>
+  </section>
+
+  <footer class="legal">
+    Based on <em>Thieves of the Tome Core Rules v1.0</em>, Ch. 5 (Embody Na'zar).
+    Companion to the other play sheets. For personal play use.
+    &copy; 2025 George Philbrick / First Pancake Studios.
+  </footer>
+</div>
+
+<script type="module">
+const KEY = "tott-gm-module";
+const ROOM_KEY = "tott-room";
+const SUPABASE_URL = "https://wbrfqsxsfcfijphlaiye.supabase.co";
+const SUPABASE_KEY = "sb_publishable_xN88kgc3CLZJGIiAKK03cw_VAVSICqS";
+let magic = "overt";
+
+// Load Supabase (optional — sharing disables gracefully if it can't load)
+let sb = null;
+try {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  if (SUPABASE_URL && SUPABASE_KEY) sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch (e) { console.warn("Supabase unavailable — sharing disabled.", e); }
+let room = null;
+
+  // ---- palette rows ----
+  function palLine(kind, data) {
+    data = data || {};
+    const line = document.createElement("div");
+    line.className = "pal-line";
+    if (kind === "locations") {
+      line.innerHTML = '<input type="text" class="p1" placeholder="A place in the world">';
+    } else {
+      const ph1 = kind === "obstacles" ? "Object / situation" : "Verb";
+      const ph2 = kind === "obstacles" ? "causes… (negative effect)" : "effect it inflicts";
+      line.innerHTML =
+        '<input type="text" class="p1" placeholder="' + ph1 + '">' +
+        '<span class="arrow">&rarr;</span>' +
+        '<input type="text" class="p2" placeholder="' + ph2 + '">';
+    }
+    line.querySelector(".p1").value = data.a || "";
+    if (line.querySelector(".p2")) line.querySelector(".p2").value = data.b || "";
+    const del = document.createElement("button");
+    del.className = "del"; del.title = "Remove"; del.textContent = "×";
+    del.addEventListener("click", () => line.remove());
+    line.appendChild(del);
+    document.getElementById(kind).appendChild(line);
+    return line;
+  }
+
+  // ---- antagonist cards ----
+  function antagCard(data) {
+    data = data || {};
+    const card = document.createElement("div");
+    card.className = "antag";
+    card.innerHTML =
+      '<div class="ant-head">' +
+        '<input type="text" class="a-title" placeholder="Title — e.g. The Blue Robe">' +
+        '<button class="ant-del" type="button">Remove</button>' +
+      '</div>' +
+      '<textarea class="a-desc" rows="2" placeholder="Personality / description drawn from your book"></textarea>' +
+      '<div class="power">' +
+        '<span class="power-label">Power</span>' +
+        '<input type="text" class="a-pname" placeholder="Power name">' +
+        '<input type="text" class="a-pdesc" placeholder="What it does">' +
+      '</div>';
+    card.querySelector(".a-title").value = data.title || "";
+    card.querySelector(".a-desc").value = data.desc || "";
+    card.querySelector(".a-pname").value = data.powerName || "";
+    card.querySelector(".a-pdesc").value = data.powerDesc || "";
+    card.querySelector(".ant-del").addEventListener("click", () => card.remove());
+    document.getElementById("antagonists").appendChild(card);
+    return card;
+  }
+
+  // ---- magic toggle ----
+  document.getElementById("magicSwitch").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    magic = b.dataset.magic;
+    document.querySelectorAll("#magicSwitch button").forEach(x => x.classList.toggle("on", x === b));
+  });
+
+  // ---- example chips fill their target field ----
+  document.querySelectorAll(".chips").forEach(group => {
+    const target = group.dataset.target;
+    group.querySelectorAll(".chip").forEach(chip => {
+      chip.addEventListener("click", () => { document.getElementById(target).value = chip.textContent; });
+    });
+  });
+
+  // ---- add buttons ----
+  document.querySelectorAll("[data-add]").forEach(btn => {
+    btn.addEventListener("click", () => palLine(btn.dataset.add));
+  });
+  document.getElementById("addAntag").addEventListener("click", () => antagCard());
+
+  // ---- serialize / restore ----
+  function serialize() {
+    const cols = {};
+    ["locations", "obstacles", "actions"].forEach(k => {
+      cols[k] = [...document.getElementById(k).children].map(line => ({
+        a: line.querySelector(".p1").value,
+        b: line.querySelector(".p2") ? line.querySelector(".p2").value : ""
+      })).filter(e => e.a || e.b);
+    });
+    return {
+      tomeTitle: document.getElementById("tomeTitle").value,
+      genre: document.getElementById("genre").value,
+      magic,
+      whiteGuard: document.getElementById("whiteGuard").value,
+      library: document.getElementById("library").value,
+      escape: document.getElementById("escape").value,
+      palette: cols,
+      antagonists: [...document.getElementById("antagonists").children].map(c => ({
+        title: c.querySelector(".a-title").value,
+        desc: c.querySelector(".a-desc").value,
+        powerName: c.querySelector(".a-pname").value,
+        powerDesc: c.querySelector(".a-pdesc").value
+      }))
+    };
+  }
+
+  function setMagic(v) {
+    magic = v === "covert" ? "covert" : "overt";
+    document.querySelectorAll("#magicSwitch button").forEach(x => x.classList.toggle("on", x.dataset.magic === magic));
+  }
+
+  function restore(d, blankCounts) {
+    d = d || {};
+    document.getElementById("tomeTitle").value = d.tomeTitle || "";
+    document.getElementById("genre").value = d.genre || "";
+    setMagic(d.magic);
+    document.getElementById("whiteGuard").value = d.whiteGuard || "";
+    document.getElementById("library").value = d.library || "";
+    document.getElementById("escape").value = d.escape || "";
+
+    ["locations", "obstacles", "actions"].forEach(k => {
+      const host = document.getElementById(k); host.innerHTML = "";
+      const list = (d.palette && d.palette[k]) || [];
+      if (list.length) list.forEach(e => palLine(k, e));
+      else for (let i = 0; i < (blankCounts || 3); i++) palLine(k);
+    });
+
+    const host = document.getElementById("antagonists"); host.innerHTML = "";
+    const ants = d.antagonists || [];
+    if (ants.length) ants.forEach(a => antagCard(a));
+    else antagCard();
+  }
+
+  // ---- buttons ----
+  document.getElementById("saveBtn").addEventListener("click", () => {
+    localStorage.setItem(KEY, JSON.stringify(serialize())); flash("Saved");
+  });
+  document.getElementById("loadBtn").addEventListener("click", () => {
+    const raw = localStorage.getItem(KEY);
+    if (raw) { restore(JSON.parse(raw)); flash("Loaded"); } else flash("Nothing saved");
+  });
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    if (confirm("Clear the whole GM module?")) restore({});
+  });
+
+  document.getElementById("presetBtn").addEventListener("click", () => {
+    if (!confirm("Fill in the first-game module (The Direct Pursuit)? This replaces the Escape Condition and Antagonists.")) return;
+    const cur = serialize();
+    cur.escape = "The thieves will escape when they reach [location] with [stealable item] and [stealable item].";
+    cur.antagonists = [
+      { title: "The Blue Robe",   desc: "A mage of the White Guard guarding one of the stealable items.", powerName: "Spellcasting", powerDesc: "Casts a single spell at will, knowing exactly what it does." },
+      { title: "The Yellow Robe", desc: "A mage of the White Guard guarding the other stealable item.",   powerName: "Spellcasting", powerDesc: "Casts a single spell at will, knowing exactly what it does." },
+      { title: "The Purple Robe", desc: "A mage of the White Guard who intercepts the thieves en route to the escape location.", powerName: "Spellcasting", powerDesc: "Casts a single spell at will, knowing exactly what it does." }
+    ];
+    restore(cur);
+    flash("Preset loaded");
+  });
+
+  function flash(msg) {
+    const b = document.getElementById("saveBtn");
+    const old = b.dataset.label || b.textContent; b.dataset.label = old;
+    b.textContent = msg; setTimeout(() => b.textContent = b.dataset.label, 1100);
+  }
+
+  // ---- room sharing ----
+  function inRoom() { return !!(room && sb); }
+  function genCode() {
+    const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let s = ""; for (let i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)];
+    return "THIEF-" + s;
+  }
+  function setShareStatus(html) { document.getElementById("shareStatus").innerHTML = html || ""; wireStopShare(); }
+  function wireStopShare() {
+    const s = document.getElementById("stopShare");
+    if (s) s.addEventListener("click", async (e) => {
+      e.preventDefault();
+      if (!inRoom()) return;
+      await sb.from("room_tomeality").delete().eq("room", room);
+      setShareStatus("Stopped sharing. Players no longer see the Tomeality.");
+    });
+  }
+  function updateRoomBar() {
+    const bar = document.getElementById("roomBar");
+    if (room) {
+      bar.classList.add("in-room");
+      document.getElementById("roomStatus").innerHTML = '<span class="dot"></span>Room <b>' + room + '</b>';
+    } else {
+      bar.classList.remove("in-room");
+      document.getElementById("roomStatus").innerHTML = '<span class="dot"></span>Working locally';
+      setShareStatus("");
+    }
+  }
+  async function refreshShareStatus() {
+    if (!inRoom()) { setShareStatus(""); return; }
+    const { data } = await sb.from("room_tomeality").select("updated_at").eq("room", room).maybeSingle();
+    if (data) setShareStatus('Shared to <b>' + room + '</b> &#10003; &mdash; players see this on The Table. Re-share after edits. <a href="#" id="stopShare">Stop sharing</a>');
+    else setShareStatus('Not shared yet. Click <b>Share to room</b> once you’ve introduced the Tomeality.');
+  }
+  async function joinRoom(code) {
+    if (!sb) { setShareStatus("Sharing unavailable (couldn’t load Supabase)."); return; }
+    room = String(code).toUpperCase().trim();
+    localStorage.setItem(ROOM_KEY, room);
+    history.replaceState(null, "", "#room=" + room);
+    updateRoomBar();
+    await refreshShareStatus();
+  }
+  function leaveRoom() {
+    room = null; localStorage.removeItem(ROOM_KEY);
+    history.replaceState(null, "", location.pathname);
+    updateRoomBar();
+  }
+  async function shareToRoom() {
+    if (!inRoom()) { setShareStatus("Create or join a room first, then share."); return; }
+    const d = serialize();
+    const { error } = await sb.from("room_tomeality").upsert({
+      room, genre: d.genre, magic: d.magic, white_guard: d.whiteGuard, library: d.library, escape: d.escape,
+      updated_at: new Date().toISOString()
+    });
+    if (error) { setShareStatus("Share failed: " + error.message); return; }
+    setShareStatus('Shared to <b>' + room + '</b> &#10003; &mdash; players see this on The Table. Re-share after edits. <a href="#" id="stopShare">Stop sharing</a>');
+    flash("Shared");
+  }
+  document.getElementById("createRoomBtn").addEventListener("click", () => joinRoom(genCode()));
+  document.getElementById("joinRoomBtn").addEventListener("click", () => {
+    const c = document.getElementById("joinInput").value.trim();
+    if (c) { document.getElementById("joinInput").value = ""; joinRoom(c); }
+  });
+  document.getElementById("joinInput").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("joinRoomBtn").click(); });
+  document.getElementById("leaveRoomBtn").addEventListener("click", leaveRoom);
+  document.getElementById("shareBtn").addEventListener("click", shareToRoom);
+  document.getElementById("copyLinkBtn").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(location.href); setShareStatus("Invite link copied — share it with your table."); }
+    catch (e) { setShareStatus("Invite link: " + location.href); }
+  });
+  if (!sb) { ["createRoomBtn", "joinRoomBtn", "joinInput"].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; }); }
+
+  // ---- init ----
+  const raw = localStorage.getItem(KEY);
+  if (raw) { try { restore(JSON.parse(raw)); } catch (e) { restore({}); } }
+  else { restore({}); }
+
+  const hashMatch = location.hash.match(/room=([A-Za-z0-9\-]+)/);
+  const startRoom = hashMatch ? hashMatch[1] : localStorage.getItem(ROOM_KEY);
+  if (startRoom && sb) joinRoom(startRoom); else updateRoomBar();
+</script>
+</body>
+</html>

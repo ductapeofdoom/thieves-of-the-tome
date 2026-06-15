@@ -93,6 +93,16 @@
   }
   .presence .who.me { background: var(--accent); color: var(--parchment); border-color: var(--accent); }
 
+  .tomeality-view {
+    background: rgba(107,58,107,.06); border: 1px solid var(--accent-soft);
+    border-left: 5px solid var(--accent); border-radius: 10px;
+    padding: .9rem 1.2rem 1rem; margin-bottom: 1.5rem;
+  }
+  .tomeality-view h2 { margin: 0 0 .15rem; color: var(--accent); font-size: 1.15rem; }
+  .tomeality-view .src { font-size: .78rem; font-style: italic; opacity: .65; margin: 0 0 .7rem; }
+  .tome-grid { display: grid; grid-template-columns: auto 1fr; gap: .35rem .9rem; font-size: .92rem; }
+  .tome-grid .tk { font-weight: bold; color: var(--accent); white-space: nowrap; }
+
   .add-panel {
     background: rgba(107,58,107,.06); border: 1px solid var(--accent-soft);
     border-radius: 10px; padding: 1rem 1.1rem; margin-bottom: 1.5rem;
@@ -178,6 +188,7 @@
     <a href="the-table.html" class="active" aria-current="page">The Table</a>
     <a href="thief-character-sheet.html">Thief Sheet</a>
     <a href="gm-library.html">GM Library</a>
+    <a href="gm-module.html">GM Module</a>
   </nav>
 
   <header class="title">
@@ -210,6 +221,8 @@
   </div>
 
   <div class="presence" id="presence"></div>
+
+  <section class="tomeality-view" id="tomealityView" style="display:none"></section>
 
   <div class="add-panel">
     <div class="add-row">
@@ -562,13 +575,43 @@ function subscribe() {
   if (!inRoom()) return;
   channel = sb.channel("table-" + room, { config: { presence: { key: clientId } } })
     .on("postgres_changes", { event: "*", schema: "public", table: "table_books", filter: "room=eq." + room }, () => refresh())
+    .on("postgres_changes", { event: "*", schema: "public", table: "room_tomeality", filter: "room=eq." + room }, () => refreshTomeality())
     .on("presence", { event: "sync" }, () => renderPresence())
     .subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
         await channel.track({ name: playerName || "Anonymous thief" });
         renderPresence();
+        refreshTomeality();
       }
     });
+}
+
+async function refreshTomeality() {
+  const el = document.getElementById("tomealityView");
+  if (!inRoom()) { el.style.display = "none"; el.innerHTML = ""; return; }
+  const { data } = await sb.from("room_tomeality").select("*").eq("room", room).maybeSingle();
+  const has = data && (data.genre || data.magic || data.white_guard || data.library || data.escape);
+  if (!has) { el.style.display = "none"; el.innerHTML = ""; return; }
+
+  const rows = [];
+  if (data.genre)       rows.push(["Genre", data.genre]);
+  if (data.magic)       rows.push(["Magic", data.magic === "covert" ? "Covert" : "Overt"]);
+  if (data.white_guard) rows.push(["White Guard", data.white_guard]);
+  if (data.library)     rows.push(["Library of Na'zar", data.library]);
+  if (data.escape)      rows.push(["Escape Condition", data.escape]);
+
+  el.innerHTML = "";
+  const h = document.createElement("h2"); h.textContent = "The Tomeality";
+  const src = document.createElement("p"); src.className = "src"; src.textContent = "Introduced by your GM";
+  el.append(h, src);
+  const grid = document.createElement("div"); grid.className = "tome-grid";
+  rows.forEach(([k, v]) => {
+    const kd = document.createElement("div"); kd.className = "tk"; kd.textContent = k;
+    const vd = document.createElement("div"); vd.className = "tv"; vd.textContent = v;
+    grid.append(kd, vd);
+  });
+  el.appendChild(grid);
+  el.style.display = "";
 }
 function updateRoomBar() {
   const bar = document.getElementById("roomBar");
@@ -593,7 +636,7 @@ function leaveRoom() {
   if (channel) { sb.removeChannel(channel); channel = null; }
   room = null; localStorage.removeItem(ROOM_KEY);
   history.replaceState(null, "", location.pathname);
-  updateRoomBar(); renderPresence(); setMsg("Left the room. Back to your local table.");
+  updateRoomBar(); renderPresence(); refreshTomeality(); setMsg("Left the room. Back to your local table.");
   refresh();
 }
 document.getElementById("createRoomBtn").addEventListener("click", () => joinRoom(genCode()));
