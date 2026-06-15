@@ -604,8 +604,8 @@ document.getElementById("joinRoomBtn").addEventListener("click", () => {
 document.getElementById("joinInput").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("joinRoomBtn").click(); });
 document.getElementById("leaveRoomBtn").addEventListener("click", leaveRoom);
 document.getElementById("copyLinkBtn").addEventListener("click", async () => {
-  try { await navigator.clipboard.writeText(location.href); setMsg("Invite link copied — share it with your table."); }
-  catch (e) { setMsg("Invite link: " + location.href); }
+  try { await navigator.clipboard.writeText(location.hash.substring(6)); setMsg("Invite link copied — share it with your table."); }
+  catch (e) { setMsg("Invite link: " + location.hash.substring(6)); }
 });
 
 // ---------- init ----------
