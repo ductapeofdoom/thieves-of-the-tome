@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thieves of the Tome — Play Sheets</title>
+<style>
+  :root {
+    --ink: #1c1a17;
+    --parchment: #f4ecd8;
+    --line: #b8a983;
+    --red: #7a2d2d;       /* thief sheet accent */
+    --blue: #3a4a6b;      /* spellsheet accent */
+    --gold: #b8860b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    padding: 3rem 1.25rem 4rem;
+    font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    color: var(--ink);
+    background: var(--parchment);
+    background-image: radial-gradient(circle at 18% 0%, #fff8e9 0%, transparent 55%),
+                      radial-gradient(circle at 82% 100%, #efe3c4 0%, transparent 50%);
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+
+  .site-nav {
+    display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center;
+    margin: 0 auto 2rem; max-width: 760px;
+  }
+  .site-nav a {
+    font-size: .85rem; text-decoration: none; color: var(--ink);
+    opacity: .65; padding: .3rem .85rem; border-radius: 999px; border: 1px solid transparent;
+  }
+  .site-nav a:hover { opacity: 1; background: rgba(0,0,0,.05); }
+  .site-nav a.active {
+    opacity: 1; font-weight: bold; color: var(--ink);
+    border-color: var(--line);
+  }
+
+  header.hero { text-align: center; margin-bottom: 2.5rem; }
+  header.hero .eyebrow {
+    text-transform: uppercase; letter-spacing: 3px; font-size: .8rem; opacity: .6; margin: 0 0 .5rem;
+  }
+  header.hero h1 {
+    margin: 0; font-size: 2.8rem; line-height: 1.05; letter-spacing: 1px;
+    color: var(--ink);
+  }
+  header.hero h1 .top { display: block; color: var(--red); }
+  header.hero h1 .bot { display: block; color: var(--blue); font-size: .55em; letter-spacing: 4px; text-transform: uppercase; margin-top: .35rem; }
+  header.hero p.tag { font-style: italic; opacity: .8; margin: 1rem 0 0; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; }
+  a.card {
+    display: flex; flex-direction: column; text-decoration: none; color: inherit;
+    background: rgba(255,255,255,.4);
+    border: 1px solid var(--line);
+    border-top: 5px solid var(--accent, var(--line));
+    border-radius: 10px;
+    padding: 1.5rem 1.4rem 1.6rem;
+    transition: transform .12s ease, box-shadow .12s ease;
+    box-shadow: 0 1px 0 #fff inset;
+  }
+  a.card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,.12); }
+  a.card.thief { --accent: var(--red); }
+  a.card.spell { --accent: var(--blue); }
+  a.card.table { --accent: #6b3a6b; }
+  a.card.gm { --accent: #3f5e3f; }
+
+  a.card .chip {
+    align-self: flex-start; font-size: .72rem; text-transform: uppercase; letter-spacing: 1px;
+    color: #fff; background: var(--accent); border-radius: 999px; padding: .15rem .6rem; margin-bottom: .8rem;
+  }
+  a.card h2 { margin: 0 0 .35rem; font-size: 1.45rem; color: var(--accent); }
+  a.card p { margin: 0; font-size: .92rem; line-height: 1.45; opacity: .85; }
+  a.card .go { margin-top: 1rem; font-weight: bold; color: var(--accent); font-size: .9rem; }
+  a.card .go::after { content: " \2192"; }
+
+  .ref {
+    margin-top: 1.5rem; text-align: center; font-size: .9rem;
+  }
+  .ref a { color: var(--ink); }
+
+  .flow {
+    margin-top: 2.5rem; background: rgba(255,255,255,.35);
+    border: 1px solid var(--line); border-radius: 10px; padding: 1.4rem 1.6rem;
+  }
+  .flow h3 { margin: 0 0 .8rem; color: var(--ink); font-size: 1.05rem; text-align: center; letter-spacing: .5px; }
+  .flow ol { margin: 0; padding-left: 1.2rem; line-height: 1.6; font-size: .92rem; }
+  .flow ol b.s { color: var(--blue); }
+  .flow ol b.t { color: var(--red); }
+
+  footer.legal { text-align: center; font-size: .75rem; opacity: .6; margin-top: 2.5rem; }
+
+  @media (max-width: 560px) {
+    .cards { grid-template-columns: 1fr; }
+    header.hero h1 { font-size: 2.1rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="site-nav">
+    <a href="index.html" class="active" aria-current="page">Home</a>
+    <a href="tome-spellsheet.html">Spellsheet</a>
+    <a href="the-table.html">The Table</a>
+    <a href="thief-character-sheet.html">Thief Sheet</a>
+    <a href="gm-library.html">GM Library</a>
+  </nav>
+
+  <header class="hero">
+    <p class="eyebrow">Library of Na'zar &mdash; Play Sheets</p>
+    <h1><span class="top">Thieves</span> <span class="bot">of the Tome</span></h1>
+    <p class="tag">Steal a Tome. Cast unknowable magick. Escape the White Guard.</p>
+  </header>
+
+  <div class="cards">
+    <a class="card spell" href="tome-spellsheet.html">
+      <span class="chip">Chapter 2 &middot; Tomecraft</span>
+      <h2>Spellsheet</h2>
+      <p>Scribe six secret spells for the book you brought &mdash; Name, Choice, and Effect. Written in the Spell Library phase, then wielded by another thief.</p>
+      <span class="go">Open spellsheet</span>
+    </a>
+
+    <a class="card table" href="the-table.html">
+      <span class="chip">The Heist</span>
+      <h2>The Table</h2>
+      <p>The shared pile of Tomes. Add books from Project Gutenberg by link or search, then steal one that isn't yours to play.</p>
+      <span class="go">Open the table</span>
+    </a>
+
+    <a class="card thief" href="thief-character-sheet.html">
+      <span class="chip">Chapter 3 &middot; The Thieves</span>
+      <h2>Thief Sheet</h2>
+      <p>Build your thief from a stolen Tome &mdash; name, adjectives, inventory, destinies, dooms, and your specialty in the heist crew.</p>
+      <span class="go">Open thief sheet</span>
+    </a>
+
+    <a class="card gm" href="gm-library.html">
+      <span class="chip">For the Game Master</span>
+      <h2>GM Spell Library</h2>
+      <p>Import every player's exported spellsheet into one read-only ledger, so you can look up any spell's hidden effect during play.</p>
+      <span class="go">Open GM library</span>
+    </a>
+  </div>
+
+  <p class="ref">Reference: <a href="character-creation-fields.md">character-creation-fields.md</a> &mdash; the full field spec.</p>
+
+  <div class="flow">
+    <h3>Which sheet, when?</h3>
+    <ol>
+      <li><b class="s">Spell Library phase</b> &mdash; everyone fills a <b class="s">Spellsheet</b> for the book they brought, in secret, then places that book in the center.</li>
+      <li><b class="t">Character Creation phase</b> &mdash; steal a <em>different</em> book from the center and fill a <b class="t">Thief Sheet</b> from it.</li>
+      <li>You cast from the Tome you stole &mdash; using the spellsheet someone <em>else</em> wrote, whose effects you won't know until they fire.</li>
+    </ol>
+  </div>
+
+  <footer class="legal">
+    Based on <em>Thieves of the Tome Core Rules v1.0</em>, Chapters 2 &amp; 3.
+    For personal play use. &copy; 2025 George Philbrick / First Pancake Studios.
+  </footer>
+</div>
+</body>
+</html>

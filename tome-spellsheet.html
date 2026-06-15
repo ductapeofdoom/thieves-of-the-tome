@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thieves of the Tome — Spellsheet</title>
+<style>
+  :root {
+    --ink: #1c1a17;
+    --parchment: #f4ecd8;
+    --parchment-dk: #e7dcc0;
+    --line: #b8a983;
+    --accent: #3a4a6b;        /* inky blue to distinguish from the red thief sheet */
+    --accent-soft: #5a6e94;
+    --gold: #b8860b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 2rem 1rem 4rem;
+    font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    color: var(--ink);
+    background: var(--parchment);
+    background-image: radial-gradient(circle at 20% 0%, #fff8e9 0%, transparent 60%),
+                      radial-gradient(circle at 80% 100%, #efe3c4 0%, transparent 55%);
+  }
+  .sheet { max-width: 980px; margin: 0 auto; }
+
+  .site-nav {
+    display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center;
+    margin: 0 auto 1.5rem; max-width: 980px;
+  }
+  .site-nav a {
+    font-size: .85rem; text-decoration: none; color: var(--ink);
+    opacity: .65; padding: .3rem .85rem; border-radius: 999px; border: 1px solid transparent;
+  }
+  .site-nav a:hover { opacity: 1; background: rgba(0,0,0,.05); }
+  .site-nav a.active {
+    opacity: 1; font-weight: bold; color: var(--accent, var(--ink));
+    border-color: var(--accent, var(--line));
+  }
+
+  header.title {
+    text-align: center;
+    border-bottom: 3px double var(--accent);
+    padding-bottom: .75rem;
+    margin-bottom: 1.25rem;
+  }
+  header.title h1 {
+    margin: 0; font-size: 2.1rem; letter-spacing: 1px;
+    color: var(--accent); text-transform: uppercase;
+  }
+  header.title p { margin: .25rem 0 0; font-style: italic; opacity: .8; }
+
+  .secret {
+    text-align: center; font-style: italic; color: var(--accent);
+    background: rgba(58,74,107,.08); border: 1px dashed var(--accent-soft);
+    border-radius: 6px; padding: .5rem .75rem; margin-bottom: 1.25rem; font-size: .9rem;
+  }
+
+  .toolbar {
+    display: flex; flex-wrap: wrap; gap: .75rem; align-items: center;
+    justify-content: center; margin-bottom: 1.25rem;
+  }
+  .btn {
+    border: 2px solid var(--accent); background: var(--parchment); color: var(--accent);
+    padding: .35rem .9rem; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: .9rem;
+  }
+  .btn:hover { background: var(--accent); color: var(--parchment); }
+
+  .tome-row { display: grid; grid-template-columns: 130px 1fr; gap: .75rem; align-items: center; margin-bottom: 1.25rem; }
+  .tome-row label { font-weight: bold; }
+
+  input[type=text], textarea {
+    width: 100%; font-family: inherit; font-size: 1rem; color: var(--ink);
+    background: var(--parchment); border: 0; border-bottom: 1.5px solid var(--line);
+    padding: .35rem .25rem; outline: none;
+  }
+  input[type=text]:focus, textarea:focus { border-bottom-color: var(--accent); background: #fffdf6; }
+  textarea {
+    resize: vertical; min-height: 3.2rem; border: 1.5px solid var(--line);
+    border-radius: 6px; background: rgba(255,255,255,.4);
+  }
+
+  /* spell grid header */
+  .grid-head, .spell {
+    display: grid;
+    grid-template-columns: 2.4rem 1.6fr 1.5fr 2.6fr 2.2rem;
+    gap: .6rem;
+    align-items: start;
+  }
+  .grid-head {
+    font-weight: bold; color: var(--accent); border-bottom: 2px solid var(--accent);
+    padding-bottom: .35rem; margin-bottom: .6rem; font-size: .95rem;
+  }
+  .grid-head .sub { display: block; font-weight: normal; font-style: italic; opacity: .65; font-size: .75rem; }
+
+  .spell {
+    background: rgba(255,255,255,.35);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: .6rem .7rem;
+    margin-bottom: .6rem;
+  }
+  .spell.cast { opacity: .65; background: rgba(184,134,11,.10); }
+  .spell .idx { text-align: center; font-weight: bold; opacity: .55; padding-top: .35rem; }
+  .spell .colstack { display: flex; flex-direction: column; gap: .2rem; }
+  .spell .colstack label {
+    font-size: .65rem; text-transform: uppercase; letter-spacing: .5px; opacity: .55; font-weight: bold;
+  }
+
+  .star {
+    width: 2rem; height: 2rem; border: 0; background: transparent; cursor: pointer;
+    font-size: 1.4rem; line-height: 1; color: var(--line); align-self: start; padding-top: .15rem;
+  }
+  .star.on { color: var(--gold); text-shadow: 0 0 4px rgba(184,134,11,.5); }
+  .star-wrap { display: flex; flex-direction: column; align-items: center; }
+  .star-wrap .tag { font-size: .55rem; text-transform: uppercase; opacity: .5; }
+
+  .add-row { text-align: center; margin: 1rem 0 .5rem; }
+  .min-note { text-align: center; font-size: .82rem; font-style: italic; opacity: .7; margin-bottom: 1rem; }
+  .bookmark-note { text-align: center; font-size: .82rem; opacity: .7; }
+
+  .gm-link { text-align: center; font-size: .88rem; margin-top: 1.75rem; }
+  .gm-link a { color: var(--accent); font-weight: bold; }
+
+  footer.legal { text-align: center; font-size: .75rem; opacity: .6; margin-top: 2rem; }
+
+  @media print {
+    body { background: #fff; padding: 0; }
+    .toolbar, .btn, .add-row, .site-nav, .gm-link { display: none; }
+    .spell { break-inside: avoid; }
+    input, textarea { background: #fff; }
+    .secret { background: #fff; }
+  }
+  @media (max-width: 680px) {
+    .grid-head { display: none; }
+    .spell { grid-template-columns: 2rem 1fr 2.2rem; grid-template-areas: "idx name star" "idx choice star" "idx effect star"; }
+    .spell .idx { grid-area: idx; }
+    .spell .c-name { grid-area: name; }
+    .spell .c-choice { grid-area: choice; }
+    .spell .c-effect { grid-area: effect; }
+    .spell .star-wrap { grid-area: star; }
+    .spell .colstack label { font-size: .7rem; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <nav class="site-nav">
+    <a href="index.html">Home</a>
+    <a href="tome-spellsheet.html" class="active" aria-current="page">Spellsheet</a>
+    <a href="the-table.html">The Table</a>
+    <a href="thief-character-sheet.html">Thief Sheet</a>
+    <a href="gm-library.html">GM Library</a>
+  </nav>
+
+  <header class="title">
+    <h1>Spellsheet</h1>
+    <p>Tomecraft &mdash; Scribed in the Spell Library Phase</p>
+  </header>
+
+  <div class="secret">
+    &#128274; Keep these effects <strong>secret</strong>. You write spells for the Tome you brought;
+    another thief will wield it without knowing what the spells do. Do not violate Na'zar's will.
+  </div>
+
+  <div class="toolbar">
+    <button class="btn" id="saveBtn">Save</button>
+    <button class="btn" id="loadBtn">Load</button>
+    <button class="btn" id="exportBtn" title="Download this spellsheet as a .json file to send to your GM">Export &#8595;</button>
+    <button class="btn" id="clearBtn">Clear</button>
+    <button class="btn" onclick="window.print()">Print</button>
+  </div>
+
+  <div class="tome-row">
+    <label for="tomeTitle">Tome Title</label>
+    <input type="text" id="tomeTitle" placeholder="The book you brought to the table">
+  </div>
+
+  <div class="grid-head">
+    <span></span>
+    <span>Name<span class="sub">Chapter title, or first sentence if untitled</span></span>
+    <span>Choice<span class="sub">Must start with &ldquo;Choose&hellip;&rdquo;</span></span>
+    <span>Effect<span class="sub">1&ndash;2 sentences &mdash; what it does</span></span>
+    <span>Cast</span>
+  </div>
+
+  <div id="spells"></div>
+
+  <p class="min-note">Skip foreword / introduction / table-of-contents sections &mdash; write at least <strong>6</strong> spells.</p>
+
+  <div class="add-row">
+    <button class="btn" id="addBtn">+ Add spell</button>
+  </div>
+  <p class="bookmark-note">Tip: bookmark the final chapter you turned into a spell so other players know how many spells this Tome holds.</p>
+
+  <p class="gm-link">Are you the GM collecting everyone's spells? Use the <a href="gm-library.html">GM Spell Library &rarr;</a></p>
+
+  <footer class="legal">
+    Fields from <em>Thieves of the Tome Core Rules v1.0</em>, Ch. 2 (Tomecraft).
+    Companion to the Thief character sheet. For personal play use.
+    &copy; 2025 George Philbrick / First Pancake Studios.
+  </footer>
+</div>
+
+<script>
+(function () {
+  const STORAGE_KEY = "tott-spellsheet";
+  const MIN_SPELLS = 6;
+  const spellsEl = document.getElementById("spells");
+
+  function makeSpell(data) {
+    data = data || {};
+    const row = document.createElement("div");
+    row.className = "spell" + (data.starred ? " cast" : "");
+    row.innerHTML =
+      '<div class="idx"></div>' +
+      '<div class="colstack c-name"><label>Name</label>' +
+        '<input type="text" class="f-name" placeholder="Chapter title"></div>' +
+      '<div class="colstack c-choice"><label>Choice</label>' +
+        '<textarea class="f-choice" rows="2" placeholder="Choose&hellip;"></textarea></div>' +
+      '<div class="colstack c-effect"><label>Effect</label>' +
+        '<textarea class="f-effect" rows="2" placeholder="Something happens to the chosen thing"></textarea></div>' +
+      '<div class="star-wrap"><button class="star' + (data.starred ? " on" : "") +
+        '" type="button" title="Star when cast — cannot recast without doom" aria-pressed="' +
+        (data.starred ? "true" : "false") + '">&#9733;</button><span class="tag">cast</span></div>';
+    row.querySelector(".f-name").value = data.name || "";
+    row.querySelector(".f-choice").value = data.choice || "";
+    row.querySelector(".f-effect").value = data.effect || "";
+    spellsEl.appendChild(row);
+    renumber();
+    return row;
+  }
+
+  function renumber() {
+    [...spellsEl.children].forEach((row, i) => {
+      row.querySelector(".idx").textContent = (i + 1);
+    });
+  }
+
+  // star toggles "cast" state
+  spellsEl.addEventListener("click", (e) => {
+    const star = e.target.closest(".star");
+    if (!star) return;
+    const on = star.classList.toggle("on");
+    star.setAttribute("aria-pressed", on ? "true" : "false");
+    star.closest(".spell").classList.toggle("cast", on);
+  });
+
+  function serialize() {
+    return {
+      tomeTitle: document.getElementById("tomeTitle").value,
+      spells: [...spellsEl.children].map(r => ({
+        name: r.querySelector(".f-name").value,
+        choice: r.querySelector(".f-choice").value,
+        effect: r.querySelector(".f-effect").value,
+        starred: r.querySelector(".star").classList.contains("on")
+      }))
+    };
+  }
+
+  function restore(d) {
+    if (!d) return;
+    document.getElementById("tomeTitle").value = d.tomeTitle || "";
+    spellsEl.innerHTML = "";
+    const list = (d.spells && d.spells.length) ? d.spells : [];
+    const n = Math.max(MIN_SPELLS, list.length);
+    for (let i = 0; i < n; i++) makeSpell(list[i]);
+  }
+
+  document.getElementById("addBtn").addEventListener("click", () => makeSpell());
+
+  document.getElementById("saveBtn").addEventListener("click", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize()));
+    flash("Saved");
+  });
+  document.getElementById("loadBtn").addEventListener("click", () => {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) { restore(JSON.parse(raw)); flash("Loaded"); } else flash("Nothing saved");
+  });
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    if (confirm("Clear the whole spellsheet?")) {
+      document.getElementById("tomeTitle").value = "";
+      spellsEl.innerHTML = "";
+      for (let i = 0; i < MIN_SPELLS; i++) makeSpell();
+    }
+  });
+
+  function flash(msg) { flashBtn(document.getElementById("saveBtn"), msg); }
+  function flashBtn(b, msg) {
+    const old = b.dataset.label || b.textContent;
+    b.dataset.label = old; b.textContent = msg;
+    setTimeout(() => b.textContent = b.dataset.label, 1100);
+  }
+
+  // ---------- Export ----------
+  function safeName(s) {
+    return (s || "spellsheet").trim().replace(/[^\w\-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "spellsheet";
+  }
+  function download(filename, obj) {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // Player: export the editor's current sheet
+  document.getElementById("exportBtn").addEventListener("click", () => {
+    const sheet = serialize();
+    download(safeName(sheet.tomeTitle) + ".spellsheet.json",
+      { type: "tott-spellsheet", version: 1, tomeTitle: sheet.tomeTitle, spells: sheet.spells });
+    flashBtn(document.getElementById("exportBtn"), "Exported");
+  });
+
+  // init
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) { try { restore(JSON.parse(raw)); } catch (e) { for (let i = 0; i < MIN_SPELLS; i++) makeSpell(); } }
+  else { for (let i = 0; i < MIN_SPELLS; i++) makeSpell(); }
+})();
+</script>
+</body>
+</html>
