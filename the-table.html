@@ -84,6 +84,15 @@
   .room-bar .identity label { font-size: .85rem; font-weight: bold; opacity: .8; }
   .room-bar .identity input { text-transform: none; letter-spacing: normal; width: 8.5rem; }
 
+  .presence { display: none; flex-wrap: wrap; gap: .4rem; align-items: center; margin: 0 0 1.25rem; font-size: .85rem; }
+  .presence.show { display: flex; }
+  .presence .label { opacity: .7; }
+  .presence .who {
+    background: rgba(107,58,107,.12); border: 1px solid var(--accent-soft); color: var(--accent);
+    border-radius: 999px; padding: .12rem .65rem;
+  }
+  .presence .who.me { background: var(--accent); color: var(--parchment); border-color: var(--accent); }
+
   .add-panel {
     background: rgba(107,58,107,.06); border: 1px solid var(--accent-soft);
     border-radius: 10px; padding: 1rem 1.1rem; margin-bottom: 1.5rem;
@@ -200,6 +209,8 @@
     </span>
   </div>
 
+  <div class="presence" id="presence"></div>
+
   <div class="add-panel">
     <div class="add-row">
       <label for="linkInput">Add by link</label>
@@ -261,6 +272,9 @@ let table = [];      // [{ gutenberg_id, title, author, cover, url, stolenBy }]
 let room = null;     // current room code (null = local mode)
 let channel = null;  // realtime subscription
 let playerName = (localStorage.getItem(PLAYER_KEY) || "").trim();  // this device's identity
+// Unique per browser-tab id, used as the presence key so each connection is distinct
+const clientId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+  : (Date.now() + "-" + Math.random().toString(36).slice(2));
 
 const pileEl = document.getElementById("pile");
 const msgEl  = document.getElementById("msg");
@@ -268,18 +282,27 @@ const nameInput = document.getElementById("nameInput");
 
 function setMsg(text, isErr) { msgEl.textContent = text || ""; msgEl.classList.toggle("err", !!isErr); }
 
-function setPlayerName(v) {
-  playerName = (v || "").trim();
+let trackTimer = null;
+function persistName() {
   if (playerName) localStorage.setItem(PLAYER_KEY, playerName);
   else localStorage.removeItem(PLAYER_KEY);
+  renderPresence(); // own chip reflects the live name immediately
+  if (channel && inRoom()) {
+    // Debounce so typing doesn't spam presence; untrack first so re-tracking
+    // replaces our entry instead of leaving a stale ghost on other clients.
+    clearTimeout(trackTimer);
+    trackTimer = setTimeout(async () => {
+      try { await channel.untrack(); await channel.track({ name: playerName || "Anonymous thief" }); } catch (e) {}
+    }, 500);
+  }
+}
+function setPlayerName(v) {
+  playerName = (v || "").trim();
+  persistName();
   if (nameInput.value !== playerName) nameInput.value = playerName;
 }
 nameInput.value = playerName;
-nameInput.addEventListener("input", () => {
-  playerName = nameInput.value.trim();
-  if (playerName) localStorage.setItem(PLAYER_KEY, playerName);
-  else localStorage.removeItem(PLAYER_KEY);
-});
+nameInput.addEventListener("input", () => { playerName = nameInput.value.trim(); persistName(); });
 function inRoom() { return !!(room && sb); }
 
 function parseId(input) {
@@ -510,12 +533,42 @@ function genCode() {
   let s = ""; for (let i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)];
   return "THIEF-" + s;
 }
+function renderPresence() {
+  const el = document.getElementById("presence");
+  if (!inRoom() || !channel) { el.classList.remove("show"); el.innerHTML = ""; return; }
+  const state = channel.presenceState();
+  const people = Object.entries(state).map(([key, metas]) => {
+    const latest = metas[metas.length - 1];  // most recent meta wins
+    // Own chip always reflects the live name field; others come from presence metadata
+    return { key, name: key === clientId ? (playerName || "Anonymous thief") : ((latest && latest.name) || "Anonymous thief") };
+  }).sort((a, b) => a.name.localeCompare(b.name));
+
+  el.innerHTML = "";
+  const label = document.createElement("span"); label.className = "label";
+  label.textContent = people.length ? "At the table (" + people.length + "):" : "Connecting…";
+  el.appendChild(label);
+  people.forEach(p => {
+    const chip = document.createElement("span");
+    chip.className = "who" + (p.key === clientId ? " me" : "");
+    chip.textContent = p.name + (p.key === clientId ? " (you)" : "");
+    el.appendChild(chip);
+  });
+  el.classList.add("show");
+}
+
 function subscribe() {
   if (channel) { sb.removeChannel(channel); channel = null; }
+  renderPresence();
   if (!inRoom()) return;
-  channel = sb.channel("table-" + room)
+  channel = sb.channel("table-" + room, { config: { presence: { key: clientId } } })
     .on("postgres_changes", { event: "*", schema: "public", table: "table_books", filter: "room=eq." + room }, () => refresh())
-    .subscribe();
+    .on("presence", { event: "sync" }, () => renderPresence())
+    .subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        await channel.track({ name: playerName || "Anonymous thief" });
+        renderPresence();
+      }
+    });
 }
 function updateRoomBar() {
   const bar = document.getElementById("roomBar");
@@ -540,7 +593,7 @@ function leaveRoom() {
   if (channel) { sb.removeChannel(channel); channel = null; }
   room = null; localStorage.removeItem(ROOM_KEY);
   history.replaceState(null, "", location.pathname);
-  updateRoomBar(); setMsg("Left the room. Back to your local table.");
+  updateRoomBar(); renderPresence(); setMsg("Left the room. Back to your local table.");
   refresh();
 }
 document.getElementById("createRoomBtn").addEventListener("click", () => joinRoom(genCode()));
