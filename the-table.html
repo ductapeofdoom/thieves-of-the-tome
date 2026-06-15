@@ -56,7 +56,30 @@
   }
   .btn:hover { background: var(--accent); color: var(--parchment); }
   .btn:disabled { opacity: .5; cursor: default; }
+  .btn:disabled:hover { background: var(--parchment); color: var(--accent); }
   .btn.small { padding: .25rem .6rem; font-size: .8rem; border-width: 1px; }
+
+  /* room bar */
+  .room-bar {
+    display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
+    background: rgba(107,58,107,.08); border: 1px solid var(--accent-soft);
+    border-radius: 10px; padding: .6rem .8rem; margin-bottom: 1rem;
+  }
+  .room-bar .status { font-size: .9rem; display: flex; align-items: center; }
+  .room-bar .status b { color: var(--accent); letter-spacing: 1px; }
+  .room-bar .dot { width: .6rem; height: .6rem; border-radius: 50%; background: #9a9a9a; display: inline-block; margin-right: .45rem; }
+  .room-bar.in-room .dot { background: #2e8b57; box-shadow: 0 0 5px #2e8b57; }
+  .room-bar .spacer { flex: 1; }
+  .room-bar input {
+    font-family: inherit; font-size: .9rem; text-transform: uppercase; letter-spacing: 1px;
+    border: 1.5px solid var(--line); border-radius: 6px; padding: .35rem .5rem; width: 9rem;
+    background: var(--parchment); color: var(--ink); outline: none;
+  }
+  .room-bar input:focus { border-color: var(--accent); background: #fffdf6; }
+  .room-bar .join-only { display: inline-flex; gap: .5rem; align-items: center; }
+  .room-bar .in-room-only { display: none; gap: .5rem; align-items: center; }
+  .room-bar.in-room .join-only { display: none; }
+  .room-bar.in-room .in-room-only { display: inline-flex; }
 
   .add-panel {
     background: rgba(107,58,107,.06); border: 1px solid var(--accent-soft);
@@ -130,7 +153,7 @@
 
   @media print {
     body { background: #fff; padding: 0; }
-    .site-nav, .add-panel, .btn, .rm { display: none; }
+    .site-nav, .add-panel, .room-bar, .btn, .rm { display: none; }
   }
 </style>
 </head>
@@ -155,6 +178,20 @@
     <a href="https://www.gutenberg.org" target="_blank" rel="noopener">Project Gutenberg</a> &mdash;
     paste an ebook link (e.g. <code>gutenberg.org/ebooks/1342</code>), search by title, or hit <strong>Surprise me</strong>.
   </p>
+
+  <div class="room-bar" id="roomBar">
+    <span class="status" id="roomStatus"><span class="dot"></span>Local table &mdash; only on this device</span>
+    <span class="spacer"></span>
+    <span class="join-only">
+      <button class="btn small" id="createRoomBtn">Create room</button>
+      <input id="joinInput" placeholder="Room code" maxlength="12">
+      <button class="btn small" id="joinRoomBtn">Join</button>
+    </span>
+    <span class="in-room-only">
+      <button class="btn small" id="copyLinkBtn">Copy invite</button>
+      <button class="btn small" id="leaveRoomBtn">Leave room</button>
+    </span>
+  </div>
 
   <div class="add-panel">
     <div class="add-row">
@@ -185,204 +222,318 @@
   <footer class="legal">
     Book data &amp; covers via <a href="https://gutendex.com" target="_blank" rel="noopener">Gutendex</a>,
     an API over <a href="https://www.gutenberg.org" target="_blank" rel="noopener">Project Gutenberg</a>.
+    Live sync by <a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a>.
     For personal play use. &copy; 2025 George Philbrick / First Pancake Studios.
   </footer>
 </div>
 
-<script>
-(function () {
-  const KEY = "tott-table";
-  const GUTENDEX = "https://gutendex.com/books";
-  // A curated pool of weird & wonderful public-domain Tomes for "Surprise me"
-  const POOL = [1342, 84, 2701, 345, 1661, 11, 1232, 2542, 76, 174, 5200, 1184, 98,
-    2600, 1080, 16, 43, 35, 36, 1727, 158, 105, 768, 1260, 215, 120, 74, 2814,
-    140, 996, 100, 30254, 1497, 4300, 2554, 1399, 514, 244, 7849, 600];
+<script type="module">
+// ---- Supabase config (publishable key — safe to embed; protected by RLS) ----
+const SUPABASE_URL = "https://wbrfqsxsfcfijphlaiye.supabase.co";
+const SUPABASE_KEY = "sb_publishable_xN88kgc3CLZJGIiAKK03cw_VAVSICqS";
 
-  const pileEl = document.getElementById("pile");
-  const msgEl = document.getElementById("msg");
-  let table = [];
+const LOCAL_KEY = "tott-table";   // local-only mode storage
+const ROOM_KEY  = "tott-room";    // last joined room code
+const GUTENDEX  = "https://gutendex.com/books";
+// A curated pool of weird & wonderful public-domain Tomes for "Surprise me"
+const POOL = [1342, 84, 2701, 345, 1661, 11, 1232, 2542, 76, 174, 5200, 1184, 98,
+  2600, 1080, 16, 43, 35, 36, 1727, 158, 105, 768, 1260, 215, 120, 74, 2814,
+  140, 996, 100, 30254, 1497, 4300, 2554, 1399, 514, 244, 7849, 600];
 
-  function load() { try { table = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { table = []; } }
-  function save() { localStorage.setItem(KEY, JSON.stringify(table)); }
+// ---- load Supabase client (resilient: page still works locally if it fails) ----
+let sb = null;
+try {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  if (SUPABASE_URL && SUPABASE_KEY) sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch (e) {
+  console.warn("Supabase unavailable — running in local-only mode.", e);
+}
 
-  function setMsg(text, isErr) { msgEl.textContent = text || ""; msgEl.classList.toggle("err", !!isErr); }
+let table = [];      // [{ gutenberg_id, title, author, cover, url, stolenBy }]
+let room = null;     // current room code (null = local mode)
+let channel = null;  // realtime subscription
 
-  function parseId(input) {
-    if (!input) return null;
-    const s = String(input).trim();
-    let m = s.match(/(?:ebooks|files|epub|text)\/(\d+)/i);
-    if (m) return +m[1];
-    m = s.match(/\b(\d{1,7})\b/);
-    return m ? +m[1] : null;
+const pileEl = document.getElementById("pile");
+const msgEl  = document.getElementById("msg");
+
+function setMsg(text, isErr) { msgEl.textContent = text || ""; msgEl.classList.toggle("err", !!isErr); }
+function inRoom() { return !!(room && sb); }
+
+function parseId(input) {
+  if (!input) return null;
+  const s = String(input).trim();
+  let m = s.match(/(?:ebooks|files|epub|text)\/(\d+)/i);
+  if (m) return +m[1];
+  m = s.match(/\b(\d{1,7})\b/);
+  return m ? +m[1] : null;
+}
+function bookFromGutendex(b) {
+  return {
+    gutenberg_id: b.id,
+    title: b.title,
+    author: (b.authors && b.authors[0] && b.authors[0].name) || "Unknown",
+    cover: (b.formats && b.formats["image/jpeg"]) || "",
+    url: "https://www.gutenberg.org/ebooks/" + b.id,
+    stolenBy: null
+  };
+}
+async function fetchByIds(ids) {
+  const r = await fetch(GUTENDEX + "/?ids=" + ids.join(","));
+  if (!r.ok) throw new Error("Gutendex " + r.status);
+  return (await r.json()).results;
+}
+
+// ---------- data layer (local or remote depending on room) ----------
+function saveLocal() { localStorage.setItem(LOCAL_KEY, JSON.stringify(table)); }
+
+async function refresh() {
+  if (inRoom()) {
+    const { data, error } = await sb.from("table_books").select("*").eq("room", room).order("created_at");
+    if (error) { setMsg("Sync error: " + error.message, true); return; }
+    table = data.map(r => ({ gutenberg_id: r.gutenberg_id, title: r.title, author: r.author, cover: r.cover, url: r.url, stolenBy: r.stolen_by }));
+  } else {
+    try { table = JSON.parse(localStorage.getItem(LOCAL_KEY)) || []; } catch (e) { table = []; }
   }
+  render();
+}
 
-  function bookFromGutendex(b) {
-    return {
-      id: b.id,
-      title: b.title,
-      author: (b.authors && b.authors[0] && b.authors[0].name) || "Unknown",
-      cover: b.formats && b.formats["image/jpeg"] || "",
-      url: "https://www.gutenberg.org/ebooks/" + b.id,
-      stolenBy: null
-    };
-  }
-
-  async function fetchByIds(ids) {
-    const r = await fetch(GUTENDEX + "/?ids=" + ids.join(","));
-    if (!r.ok) throw new Error("Gutendex " + r.status);
-    return (await r.json()).results;
-  }
-
-  function addBooks(books) {
-    let added = 0, dup = 0;
-    books.forEach(b => {
-      if (table.some(t => t.id === b.id)) { dup++; return; }
-      table.push(bookFromGutendex(b)); added++;
+async function opAdd(book) {
+  if (table.some(t => t.gutenberg_id === book.gutenberg_id)) return { dup: true };
+  if (inRoom()) {
+    const { error } = await sb.from("table_books").insert({
+      room, gutenberg_id: book.gutenberg_id, title: book.title, author: book.author, cover: book.cover, url: book.url
     });
-    if (added) { save(); render(); }
-    return { added, dup };
+    if (error && error.code !== "23505") return { error };  // 23505 = duplicate, ignore
+    await refresh();
+  } else {
+    table.push({ ...book, stolenBy: null }); saveLocal(); render();
   }
+  return { added: true };
+}
+async function opSteal(book, who) {
+  if (inRoom()) {
+    const { error } = await sb.from("table_books").update({ stolen_by: who }).eq("room", room).eq("gutenberg_id", book.gutenberg_id);
+    if (error) { setMsg("Sync error: " + error.message, true); return; }
+    await refresh();
+  } else { book.stolenBy = who; saveLocal(); render(); }
+}
+async function opReturn(book) {
+  if (inRoom()) {
+    const { error } = await sb.from("table_books").update({ stolen_by: null }).eq("room", room).eq("gutenberg_id", book.gutenberg_id);
+    if (error) { setMsg("Sync error: " + error.message, true); return; }
+    await refresh();
+  } else { book.stolenBy = null; saveLocal(); render(); }
+}
+async function opRemove(book) {
+  if (inRoom()) {
+    const { error } = await sb.from("table_books").delete().eq("room", room).eq("gutenberg_id", book.gutenberg_id);
+    if (error) { setMsg("Sync error: " + error.message, true); return; }
+    await refresh();
+  } else { table = table.filter(t => t !== book); saveLocal(); render(); }
+}
+async function opClear() {
+  if (inRoom()) {
+    const { error } = await sb.from("table_books").delete().eq("room", room);
+    if (error) { setMsg("Sync error: " + error.message, true); return; }
+    await refresh();
+  } else { table = []; saveLocal(); render(); }
+}
 
-  async function addById(id) {
-    if (table.some(t => t.id === id)) { setMsg("That Tome is already on the table.", true); return; }
-    setMsg("Fetching Tome #" + id + "…");
-    try {
-      const res = await fetchByIds([id]);
-      if (!res.length) { setMsg("No Gutenberg book found with ID " + id + ".", true); return; }
-      addBooks(res);
-      setMsg("Added “" + res[0].title + "” to the table.");
-    } catch (e) { setMsg("Couldn't reach Gutendex. Check your connection and try again.", true); }
-  }
+// ---------- add flows ----------
+async function addById(id) {
+  if (table.some(t => t.gutenberg_id === id)) { setMsg("That Tome is already on the table.", true); return; }
+  setMsg("Fetching Tome #" + id + "…");
+  try {
+    const res = await fetchByIds([id]);
+    if (!res.length) { setMsg("No Gutenberg book found with ID " + id + ".", true); return; }
+    const r = await opAdd(bookFromGutendex(res[0]));
+    if (r.error) setMsg("Couldn't add: " + r.error.message, true);
+    else if (r.dup) setMsg("That Tome is already on the table.", true);
+    else setMsg("Added “" + res[0].title + "” to the table.");
+  } catch (e) { setMsg("Couldn't reach Gutendex. Check your connection and try again.", true); }
+}
 
-  // ---- add by link ----
-  document.getElementById("addLinkBtn").addEventListener("click", () => {
-    const id = parseId(document.getElementById("linkInput").value);
-    if (!id) { setMsg("Couldn't find a Gutenberg ID in that. Paste an ebook link or numeric ID.", true); return; }
-    document.getElementById("linkInput").value = "";
-    addById(id);
-  });
-  document.getElementById("linkInput").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("addLinkBtn").click(); });
+document.getElementById("addLinkBtn").addEventListener("click", () => {
+  const id = parseId(document.getElementById("linkInput").value);
+  if (!id) { setMsg("Couldn't find a Gutenberg ID in that. Paste an ebook link or numeric ID.", true); return; }
+  document.getElementById("linkInput").value = "";
+  addById(id);
+});
+document.getElementById("linkInput").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("addLinkBtn").click(); });
 
-  // ---- search ----
-  const resultsEl = document.getElementById("searchResults");
-  async function runSearch() {
-    const q = document.getElementById("searchInput").value.trim();
-    if (!q) return;
-    setMsg("Searching Project Gutenberg…");
-    resultsEl.classList.remove("show"); resultsEl.innerHTML = "";
-    try {
-      const r = await fetch(GUTENDEX + "/?search=" + encodeURIComponent(q));
-      const list = (await r.json()).results.slice(0, 6);
-      if (!list.length) { setMsg("No matches for “" + q + "”.", true); return; }
-      setMsg(list.length + " result" + (list.length === 1 ? "" : "s") + " — pick one to add:");
-      list.forEach(b => {
-        const row = document.createElement("div");
-        row.className = "result";
-        const meta = document.createElement("div");
-        meta.className = "r-meta";
-        const t = document.createElement("div"); t.textContent = b.title;
-        const a = document.createElement("div"); a.className = "r-auth";
-        a.textContent = (b.authors && b.authors[0] && b.authors[0].name) || "Unknown";
-        meta.append(t, a);
-        const btn = document.createElement("button");
-        btn.className = "btn small"; btn.textContent = table.some(x => x.id === b.id) ? "On table" : "Add";
-        btn.disabled = table.some(x => x.id === b.id);
-        btn.addEventListener("click", () => {
-          const { added } = addBooks([b]);
-          if (added) { btn.textContent = "On table"; btn.disabled = true; setMsg("Added “" + b.title + "”."); }
-        });
-        row.append(meta, btn);
-        resultsEl.appendChild(row);
+const resultsEl = document.getElementById("searchResults");
+async function runSearch() {
+  const q = document.getElementById("searchInput").value.trim();
+  if (!q) return;
+  setMsg("Searching Project Gutenberg…");
+  resultsEl.classList.remove("show"); resultsEl.innerHTML = "";
+  try {
+    const r = await fetch(GUTENDEX + "/?search=" + encodeURIComponent(q));
+    const list = (await r.json()).results.slice(0, 6);
+    if (!list.length) { setMsg("No matches for “" + q + "”.", true); return; }
+    setMsg(list.length + " result" + (list.length === 1 ? "" : "s") + " — pick one to add:");
+    list.forEach(b => {
+      const row = document.createElement("div");
+      row.className = "result";
+      const meta = document.createElement("div"); meta.className = "r-meta";
+      const t = document.createElement("div"); t.textContent = b.title;
+      const a = document.createElement("div"); a.className = "r-auth";
+      a.textContent = (b.authors && b.authors[0] && b.authors[0].name) || "Unknown";
+      meta.append(t, a);
+      const btn = document.createElement("button");
+      const onTable = table.some(x => x.gutenberg_id === b.id);
+      btn.className = "btn small"; btn.textContent = onTable ? "On table" : "Add"; btn.disabled = onTable;
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        const res = await opAdd(bookFromGutendex(b));
+        if (res.added || res.dup) { btn.textContent = "On table"; setMsg("Added “" + b.title + "”."); }
+        else { btn.disabled = false; setMsg("Couldn't add that one.", true); }
       });
-      resultsEl.classList.add("show");
-    } catch (e) { setMsg("Couldn't reach Gutendex. Try again.", true); }
-  }
-  document.getElementById("searchBtn").addEventListener("click", runSearch);
-  document.getElementById("searchInput").addEventListener("keydown", e => { if (e.key === "Enter") runSearch(); });
-
-  // ---- surprise me ----
-  document.getElementById("surpriseBtn").addEventListener("click", async () => {
-    const available = POOL.filter(id => !table.some(t => t.id === id));
-    if (!available.length) { setMsg("The whole surprise pool is already on the table!", true); return; }
-    const id = available[Math.floor(Math.random() * available.length)];
-    await addById(id);
-  });
-
-  // ---- render ----
-  function render() {
-    pileEl.innerHTML = "";
-    table.forEach((bk, i) => {
-      const card = document.createElement("div");
-      card.className = "book" + (bk.stolenBy ? " stolen" : "");
-
-      const rm = document.createElement("button");
-      rm.className = "rm"; rm.title = "Remove from table"; rm.textContent = "×";
-      rm.addEventListener("click", () => { table.splice(i, 1); save(); render(); });
-      card.appendChild(rm);
-
-      const ribbon = document.createElement("div"); ribbon.className = "ribbon"; ribbon.textContent = "Stolen";
-      card.appendChild(ribbon);
-
-      const cw = document.createElement("div"); cw.className = "cover-wrap";
-      if (bk.cover) {
-        const img = document.createElement("img");
-        img.src = bk.cover; img.alt = bk.title; img.loading = "lazy";
-        img.addEventListener("error", () => { cw.innerHTML = ""; cw.appendChild(fallback(bk.title)); });
-        cw.appendChild(img);
-      } else { cw.appendChild(fallback(bk.title)); }
-      card.appendChild(cw);
-
-      const body = document.createElement("div"); body.className = "body";
-      const t = document.createElement("div"); t.className = "b-title"; t.textContent = bk.title;
-      const a = document.createElement("div"); a.className = "b-auth"; a.textContent = bk.author;
-      body.append(t, a);
-
-      const actions = document.createElement("div"); actions.className = "b-actions";
-      const read = document.createElement("a");
-      read.className = "read-link"; read.href = bk.url; read.target = "_blank"; read.rel = "noopener";
-      read.textContent = "Read on Gutenberg";
-      actions.appendChild(read);
-
-      if (bk.stolenBy) {
-        const sb = document.createElement("div"); sb.className = "stolen-by";
-        sb.textContent = "Stolen by " + bk.stolenBy;
-        const ret = document.createElement("button");
-        ret.className = "btn small"; ret.textContent = "Return to table";
-        ret.addEventListener("click", () => { bk.stolenBy = null; save(); render(); });
-        actions.append(sb, ret);
-      } else {
-        const steal = document.createElement("button");
-        steal.className = "btn small"; steal.textContent = "Steal";
-        steal.addEventListener("click", () => {
-          const who = prompt("Which thief steals “" + bk.title + "”?\n(Enter a player name, or leave blank.)");
-          if (who === null) return; // cancelled
-          bk.stolenBy = who.trim() || "a thief";
-          save(); render();
-        });
-        actions.appendChild(steal);
-      }
-      body.appendChild(actions);
-      card.appendChild(body);
-      pileEl.appendChild(card);
+      row.append(meta, btn);
+      resultsEl.appendChild(row);
     });
+    resultsEl.classList.add("show");
+  } catch (e) { setMsg("Couldn't reach Gutendex. Try again.", true); }
+}
+document.getElementById("searchBtn").addEventListener("click", runSearch);
+document.getElementById("searchInput").addEventListener("keydown", e => { if (e.key === "Enter") runSearch(); });
 
-    const stolen = table.filter(b => b.stolenBy).length;
-    document.getElementById("count").textContent =
-      table.length ? table.length + " Tome" + (table.length === 1 ? "" : "s") + (stolen ? " · " + stolen + " stolen" : "") : "";
-    document.getElementById("empty").style.display = table.length ? "none" : "";
-  }
+document.getElementById("surpriseBtn").addEventListener("click", async () => {
+  const available = POOL.filter(id => !table.some(t => t.gutenberg_id === id));
+  if (!available.length) { setMsg("The whole surprise pool is already on the table!", true); return; }
+  await addById(available[Math.floor(Math.random() * available.length)]);
+});
 
-  function fallback(title) {
-    const d = document.createElement("div"); d.className = "cover-fallback"; d.textContent = title; return d;
-  }
+document.getElementById("clearBtn").addEventListener("click", () => {
+  if (!table.length) return;
+  if (confirm("Clear all Tomes from the table?")) opClear();
+});
 
-  document.getElementById("clearBtn").addEventListener("click", () => {
-    if (!table.length) return;
-    if (confirm("Clear all Tomes from the table?")) { table = []; save(); render(); }
+// ---------- render ----------
+function fallback(title) {
+  const d = document.createElement("div"); d.className = "cover-fallback"; d.textContent = title; return d;
+}
+function render() {
+  pileEl.innerHTML = "";
+  table.forEach(bk => {
+    const card = document.createElement("div");
+    card.className = "book" + (bk.stolenBy ? " stolen" : "");
+
+    const rm = document.createElement("button");
+    rm.className = "rm"; rm.title = "Remove from table"; rm.textContent = "×";
+    rm.addEventListener("click", () => opRemove(bk));
+    card.appendChild(rm);
+
+    const ribbon = document.createElement("div"); ribbon.className = "ribbon"; ribbon.textContent = "Stolen";
+    card.appendChild(ribbon);
+
+    const cw = document.createElement("div"); cw.className = "cover-wrap";
+    if (bk.cover) {
+      const img = document.createElement("img");
+      img.src = bk.cover; img.alt = bk.title; img.loading = "lazy";
+      img.addEventListener("error", () => { cw.innerHTML = ""; cw.appendChild(fallback(bk.title)); });
+      cw.appendChild(img);
+    } else { cw.appendChild(fallback(bk.title)); }
+    card.appendChild(cw);
+
+    const body = document.createElement("div"); body.className = "body";
+    const t = document.createElement("div"); t.className = "b-title"; t.textContent = bk.title;
+    const a = document.createElement("div"); a.className = "b-auth"; a.textContent = bk.author;
+    body.append(t, a);
+
+    const actions = document.createElement("div"); actions.className = "b-actions";
+    const read = document.createElement("a");
+    read.className = "read-link"; read.href = bk.url; read.target = "_blank"; read.rel = "noopener";
+    read.textContent = "Read on Gutenberg";
+    actions.appendChild(read);
+
+    if (bk.stolenBy) {
+      const sb2 = document.createElement("div"); sb2.className = "stolen-by"; sb2.textContent = "Stolen by " + bk.stolenBy;
+      const ret = document.createElement("button");
+      ret.className = "btn small"; ret.textContent = "Return to table";
+      ret.addEventListener("click", () => opReturn(bk));
+      actions.append(sb2, ret);
+    } else {
+      const steal = document.createElement("button");
+      steal.className = "btn small"; steal.textContent = "Steal";
+      steal.addEventListener("click", () => {
+        const who = prompt("Which thief steals “" + bk.title + "”?\n(Enter a player name, or leave blank.)");
+        if (who === null) return;
+        opSteal(bk, who.trim() || "a thief");
+      });
+      actions.appendChild(steal);
+    }
+    body.appendChild(actions);
+    card.appendChild(body);
+    pileEl.appendChild(card);
   });
 
-  load(); render();
-})();
+  const stolen = table.filter(b => b.stolenBy).length;
+  document.getElementById("count").textContent =
+    table.length ? table.length + " Tome" + (table.length === 1 ? "" : "s") + (stolen ? " · " + stolen + " stolen" : "") : "";
+  document.getElementById("empty").style.display = table.length ? "none" : "";
+}
+
+// ---------- rooms ----------
+function genCode() {
+  const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars
+  let s = ""; for (let i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)];
+  return "THIEF-" + s;
+}
+function subscribe() {
+  if (channel) { sb.removeChannel(channel); channel = null; }
+  if (!inRoom()) return;
+  channel = sb.channel("table-" + room)
+    .on("postgres_changes", { event: "*", schema: "public", table: "table_books", filter: "room=eq." + room }, () => refresh())
+    .subscribe();
+}
+function updateRoomBar() {
+  const bar = document.getElementById("roomBar");
+  if (room) {
+    bar.classList.add("in-room");
+    document.getElementById("roomStatus").innerHTML = '<span class="dot"></span>Room <b>' + room + '</b> &mdash; synced live';
+  } else {
+    bar.classList.remove("in-room");
+    document.getElementById("roomStatus").innerHTML = '<span class="dot"></span>Local table &mdash; only on this device';
+  }
+}
+async function joinRoom(code) {
+  if (!sb) { setMsg("Multiplayer is unavailable (couldn't load Supabase).", true); return; }
+  room = String(code).toUpperCase().trim();
+  localStorage.setItem(ROOM_KEY, room);
+  history.replaceState(null, "", "#room=" + room);
+  updateRoomBar(); subscribe();
+  setMsg("Joined room " + room + ".");
+  await refresh();
+}
+function leaveRoom() {
+  if (channel) { sb.removeChannel(channel); channel = null; }
+  room = null; localStorage.removeItem(ROOM_KEY);
+  history.replaceState(null, "", location.pathname);
+  updateRoomBar(); setMsg("Left the room. Back to your local table.");
+  refresh();
+}
+document.getElementById("createRoomBtn").addEventListener("click", () => joinRoom(genCode()));
+document.getElementById("joinRoomBtn").addEventListener("click", () => {
+  const c = document.getElementById("joinInput").value.trim();
+  if (c) { document.getElementById("joinInput").value = ""; joinRoom(c); }
+});
+document.getElementById("joinInput").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("joinRoomBtn").click(); });
+document.getElementById("leaveRoomBtn").addEventListener("click", leaveRoom);
+document.getElementById("copyLinkBtn").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(location.href); setMsg("Invite link copied — share it with your table."); }
+  catch (e) { setMsg("Invite link: " + location.href); }
+});
+
+// ---------- init ----------
+if (!sb) {
+  ["createRoomBtn", "joinRoomBtn", "joinInput"].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; });
+  document.getElementById("roomStatus").innerHTML = '<span class="dot"></span>Local table (multiplayer unavailable)';
+}
+const hashMatch = location.hash.match(/room=([A-Za-z0-9\-]+)/);
+const startRoom = hashMatch ? hashMatch[1] : localStorage.getItem(ROOM_KEY);
+if (startRoom && sb) { joinRoom(startRoom); }
+else { updateRoomBar(); refresh(); }
 </script>
 </body>
 </html>
