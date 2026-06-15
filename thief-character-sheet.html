@@ -406,6 +406,18 @@
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) { try { restore(JSON.parse(raw)); } catch (e) {} }
   refreshCounters();
+
+  // a stolen Tome handed off from The Table fills the Tome and name
+  try {
+    const h = localStorage.getItem("tott-handoff-thief");
+    if (h) {
+      const d = JSON.parse(h);
+      if (d && d.title) document.getElementById("stolenTome").value = d.title;
+      if (d && d.author) document.getElementById("name").value = d.author;
+      localStorage.removeItem("tott-handoff-thief");
+      flash("Filled from The Table");
+    }
+  } catch (e) {}
 })();
 </script>
 </body>

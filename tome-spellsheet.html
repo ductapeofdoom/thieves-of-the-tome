@@ -321,6 +321,17 @@
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) { try { restore(JSON.parse(raw)); } catch (e) { for (let i = 0; i < MIN_SPELLS; i++) makeSpell(); } }
   else { for (let i = 0; i < MIN_SPELLS; i++) makeSpell(); }
+
+  // a book handed off from The Table fills the Tome title
+  try {
+    const h = localStorage.getItem("tott-handoff-spell");
+    if (h) {
+      const d = JSON.parse(h);
+      if (d && d.title) document.getElementById("tomeTitle").value = d.title;
+      localStorage.removeItem("tott-handoff-spell");
+      flash("Tome set from The Table");
+    }
+  } catch (e) {}
 })();
 </script>
 </body>
