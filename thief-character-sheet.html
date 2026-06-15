@@ -92,6 +92,8 @@
     border-radius: 4px; padding: .05rem .4rem;
   }
   .hint { font-size: .82rem; font-style: italic; opacity: .75; margin: 0 0 .75rem; }
+  .tome-link { font-size: .82rem; color: var(--accent); text-decoration: none; }
+  .tome-link:hover { text-decoration: underline; }
 
   input[type=text], textarea {
     width: 100%; font-family: inherit; font-size: 1rem; color: var(--ink);
@@ -185,6 +187,10 @@
       <input type="text" id="stolenTome" data-key="stolenTome" placeholder="Title of the book you stole">
     </div>
     <div class="field-row">
+      <span></span>
+      <a id="stolenTomeLink" class="tome-link" target="_blank" rel="noopener" hidden>Read on Gutenberg &#8599;</a>
+    </div>
+    <div class="field-row">
       <label for="specialty">Specialty</label>
       <input type="text" id="specialty" data-key="specialty" placeholder="One-word crew role — e.g. The Pilot, The Muscle">
     </div>
@@ -249,6 +255,15 @@
 <script>
 (function () {
   const STORAGE_KEY = "tott-thief-sheet";
+  let stolenTomeUrl = "";
+
+  function renderTomeLink() {
+    const a = document.getElementById("stolenTomeLink");
+    if (stolenTomeUrl) { a.href = stolenTomeUrl; a.hidden = false; }
+    else { a.hidden = true; a.removeAttribute("href"); }
+  }
+  // retyping the stolen Tome drops the imported Gutenberg link (it no longer matches)
+  document.getElementById("stolenTome").addEventListener("input", () => { stolenTomeUrl = ""; renderTomeLink(); });
 
   // ---- build repeatable rows ----
   function makeAdjOrItem(container, count, placeholderFn) {
@@ -338,6 +353,7 @@
       mode: modeSwitch.querySelector("button.active").dataset.mode,
       name: get("name"),
       stolenTome: get("stolenTome"),
+      stolenTomeUrl,
       specialty: get("specialty"),
       heistNarration: get("heistNarration"),
       adjectives: cols("#adjectives input"),
@@ -359,6 +375,7 @@
     const set = (id, v) => { if (v != null) document.getElementById(id).value = v; };
     setMode(d.mode || "full");
     set("name", d.name); set("stolenTome", d.stolenTome);
+    stolenTomeUrl = d.stolenTomeUrl || ""; renderTomeLink();
     set("specialty", d.specialty); set("heistNarration", d.heistNarration);
     (d.adjectives || []).forEach((v, i) => {
       const el = document.querySelectorAll("#adjectives input")[i]; if (el) el.value = v;
@@ -392,6 +409,7 @@
     if (confirm("Clear all fields on this sheet?")) {
       document.querySelectorAll("input[type=text], textarea").forEach(i => i.value = "");
       document.querySelectorAll(".star.on").forEach(s => { s.classList.remove("on"); s.setAttribute("aria-pressed", "false"); });
+      stolenTomeUrl = ""; renderTomeLink();
       refreshCounters();
     }
   });
@@ -406,6 +424,19 @@
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) { try { restore(JSON.parse(raw)); } catch (e) {} }
   refreshCounters();
+
+  // a stolen Tome handed off from The Table fills the Tome and name
+  try {
+    const h = localStorage.getItem("tott-handoff-thief");
+    if (h) {
+      const d = JSON.parse(h);
+      if (d && d.title) document.getElementById("stolenTome").value = d.title;
+      if (d && d.author) document.getElementById("name").value = d.author;
+      if (d && d.url) { stolenTomeUrl = d.url; renderTomeLink(); }
+      localStorage.removeItem("tott-handoff-thief");
+      flash("Filled from The Table");
+    }
+  } catch (e) {}
 })();
 </script>
 </body>

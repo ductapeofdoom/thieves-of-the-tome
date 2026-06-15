@@ -152,6 +152,9 @@
   .book .read-link { font-size: .8rem; color: var(--accent); text-decoration: none; }
   .book .read-link:hover { text-decoration: underline; }
   .book .read-link::after { content: " \2197"; }
+  .book .send { display: flex; flex-wrap: wrap; gap: .1rem .6rem; margin-top: .15rem; }
+  .book .send a { font-size: .72rem; color: var(--accent); cursor: pointer; text-decoration: none; }
+  .book .send a:hover { text-decoration: underline; }
 
   .book.stolen { opacity: .92; }
   .book.stolen .cover-wrap img, .book.stolen .cover-fallback { filter: grayscale(.7) brightness(.8); }
@@ -468,6 +471,12 @@ document.getElementById("clearBtn").addEventListener("click", () => {
   if (confirm("Clear all Tomes from the table?")) opClear();
 });
 
+// ---------- hand a book off to another sheet ----------
+function handoff(kind, data) {
+  localStorage.setItem("tott-handoff-" + kind, JSON.stringify(data));
+  location.href = kind === "spell" ? "tome-spellsheet.html" : "thief-character-sheet.html";
+}
+
 // ---------- render ----------
 function fallback(title) {
   const d = document.createElement("div"); d.className = "cover-fallback"; d.textContent = title; return d;
@@ -529,6 +538,17 @@ function render() {
       });
       actions.appendChild(steal);
     }
+
+    const send = document.createElement("div"); send.className = "send";
+    const toSpell = document.createElement("a");
+    toSpell.textContent = "Write spells →"; toSpell.title = "Open the Spellsheet with this Tome's title filled in";
+    toSpell.addEventListener("click", () => handoff("spell", { title: bk.title, url: bk.url }));
+    const toThief = document.createElement("a");
+    toThief.textContent = "Build thief →"; toThief.title = "Open the Thief Sheet with this stolen Tome and its author filled in";
+    toThief.addEventListener("click", () => handoff("thief", { title: bk.title, author: bk.author, url: bk.url }));
+    send.append(toSpell, toThief);
+    actions.appendChild(send);
+
     body.appendChild(actions);
     card.appendChild(body);
     pileEl.appendChild(card);
