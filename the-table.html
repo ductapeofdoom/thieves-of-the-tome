@@ -542,10 +542,10 @@ function render() {
     const send = document.createElement("div"); send.className = "send";
     const toSpell = document.createElement("a");
     toSpell.textContent = "Write spells →"; toSpell.title = "Open the Spellsheet with this Tome's title filled in";
-    toSpell.addEventListener("click", () => handoff("spell", { title: bk.title }));
+    toSpell.addEventListener("click", () => handoff("spell", { title: bk.title, url: bk.url }));
     const toThief = document.createElement("a");
     toThief.textContent = "Build thief →"; toThief.title = "Open the Thief Sheet with this stolen Tome and its author filled in";
-    toThief.addEventListener("click", () => handoff("thief", { title: bk.title, author: bk.author }));
+    toThief.addEventListener("click", () => handoff("thief", { title: bk.title, author: bk.author, url: bk.url }));
     send.append(toSpell, toThief);
     actions.appendChild(send);
 

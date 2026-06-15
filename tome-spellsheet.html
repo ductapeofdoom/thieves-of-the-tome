@@ -68,8 +68,10 @@
   }
   .btn:hover { background: var(--accent); color: var(--parchment); }
 
-  .tome-row { display: grid; grid-template-columns: 130px 1fr; gap: .75rem; align-items: center; margin-bottom: 1.25rem; }
+  .tome-row { display: grid; grid-template-columns: 130px 1fr; gap: .4rem .75rem; align-items: center; margin-bottom: 1.25rem; }
   .tome-row label { font-weight: bold; }
+  .tome-link { font-size: .82rem; color: var(--accent); text-decoration: none; }
+  .tome-link:hover { text-decoration: underline; }
 
   input[type=text], textarea {
     width: 100%; font-family: inherit; font-size: 1rem; color: var(--ink);
@@ -178,6 +180,8 @@
   <div class="tome-row">
     <label for="tomeTitle">Tome Title</label>
     <input type="text" id="tomeTitle" placeholder="The book you brought to the table">
+    <span></span>
+    <a id="tomeLink" class="tome-link" target="_blank" rel="noopener" hidden>Read on Gutenberg &#8599;</a>
   </div>
 
   <div class="grid-head">
@@ -211,6 +215,15 @@
   const STORAGE_KEY = "tott-spellsheet";
   const MIN_SPELLS = 6;
   const spellsEl = document.getElementById("spells");
+  let tomeUrl = "";
+
+  function renderTomeLink() {
+    const a = document.getElementById("tomeLink");
+    if (tomeUrl) { a.href = tomeUrl; a.hidden = false; }
+    else { a.hidden = true; a.removeAttribute("href"); }
+  }
+  // typing a different title drops the imported Gutenberg link (it no longer matches)
+  document.getElementById("tomeTitle").addEventListener("input", () => { tomeUrl = ""; renderTomeLink(); });
 
   function makeSpell(data) {
     data = data || {};
@@ -253,6 +266,7 @@
   function serialize() {
     return {
       tomeTitle: document.getElementById("tomeTitle").value,
+      tomeUrl,
       spells: [...spellsEl.children].map(r => ({
         name: r.querySelector(".f-name").value,
         choice: r.querySelector(".f-choice").value,
@@ -265,6 +279,7 @@
   function restore(d) {
     if (!d) return;
     document.getElementById("tomeTitle").value = d.tomeTitle || "";
+    tomeUrl = d.tomeUrl || ""; renderTomeLink();
     spellsEl.innerHTML = "";
     const list = (d.spells && d.spells.length) ? d.spells : [];
     const n = Math.max(MIN_SPELLS, list.length);
@@ -284,6 +299,7 @@
   document.getElementById("clearBtn").addEventListener("click", () => {
     if (confirm("Clear the whole spellsheet?")) {
       document.getElementById("tomeTitle").value = "";
+      tomeUrl = ""; renderTomeLink();
       spellsEl.innerHTML = "";
       for (let i = 0; i < MIN_SPELLS; i++) makeSpell();
     }
@@ -328,6 +344,7 @@
     if (h) {
       const d = JSON.parse(h);
       if (d && d.title) document.getElementById("tomeTitle").value = d.title;
+      if (d && d.url) { tomeUrl = d.url; renderTomeLink(); }
       localStorage.removeItem("tott-handoff-spell");
       flash("Tome set from The Table");
     }
