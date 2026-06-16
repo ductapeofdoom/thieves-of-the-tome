@@ -62,18 +62,41 @@
     padding: .35rem .9rem; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: .9rem;
   }
   .btn:hover { background: var(--accent); color: var(--parchment); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn:disabled:hover { background: var(--parchment); color: var(--accent); }
+  .btn.small { padding: .25rem .6rem; font-size: .8rem; border-width: 1px; }
 
-  .gm-toolbar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: 1.25rem; }
-  .lib-count { font-size: .85rem; opacity: .7; margin-left: auto; }
-  .gm-empty {
-    text-align: center; font-style: italic; opacity: .55; font-size: .95rem;
-    padding: 2.5rem 1rem; border: 1px dashed var(--line); border-radius: 10px;
+  /* room bar */
+  .room-bar {
+    display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
+    background: rgba(58,74,107,.07); border: 1px solid var(--accent-soft);
+    border-radius: 10px; padding: .6rem .8rem; margin-bottom: 1.25rem;
   }
+  .room-bar .status { font-size: .9rem; display: flex; align-items: center; }
+  .room-bar .status b { color: var(--accent); letter-spacing: 1px; }
+  .room-bar .dot { width: .6rem; height: .6rem; border-radius: 50%; background: #9a9a9a; display: inline-block; margin-right: .45rem; }
+  .room-bar.in-room .dot { background: #2e8b57; box-shadow: 0 0 5px #2e8b57; }
+  .room-bar .spacer { flex: 1; }
+  .room-bar input {
+    font-family: inherit; font-size: .9rem; text-transform: uppercase; letter-spacing: 1px;
+    border: 1.5px solid var(--line); border-radius: 6px; padding: .3rem .5rem; width: 8rem;
+    background: var(--parchment); color: var(--ink); outline: none;
+  }
+  .room-bar input:focus { border-color: var(--accent); background: #fffdf6; }
+  .room-bar .join-only { display: inline-flex; gap: .5rem; align-items: center; }
+  .room-bar .in-room-only { display: none; gap: .5rem; align-items: center; }
+  .room-bar.in-room .join-only { display: none; }
+  .room-bar.in-room .in-room-only { display: inline-flex; }
 
-  .toolbar-note { font-size: .85rem; opacity: .8; margin: 0 0 1.25rem; line-height: 1.45; }
-  .toolbar-note code { background: rgba(58,74,107,.12); padding: 0 .25rem; border-radius: 3px; }
+  .section-head { display: flex; align-items: baseline; gap: .6rem; margin: 1.6rem 0 .6rem; }
+  .section-head h2 { margin: 0; color: var(--accent); font-size: 1.1rem; }
+  .section-head .count { font-size: .82rem; opacity: .7; }
+  .section-head .spacer { flex: 1; }
+  .section-note { font-size: .82rem; opacity: .75; margin: 0 0 .9rem; line-height: 1.45; }
+  .section-note code { background: rgba(58,74,107,.12); padding: 0 .25rem; border-radius: 3px; }
 
-  /* filter */
+  .gm-toolbar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: 1rem; }
+
   .filter-row { margin-bottom: 1rem; }
   #filter {
     width: 100%; font-family: inherit; font-size: 1rem; color: var(--ink);
@@ -82,11 +105,14 @@
   }
   #filter:focus { border-color: var(--accent); background: #fffdf6; }
 
+  .empty { text-align: center; font-style: italic; opacity: .55; font-size: .9rem; padding: 1.5rem 1rem; border: 1px dashed var(--line); border-radius: 10px; margin: 0 0 1rem; }
+
   .imported {
     background: rgba(255,255,255,.5); border: 1px solid var(--line);
     border-left: 5px solid var(--accent); border-radius: 8px;
     margin-bottom: .8rem; overflow: hidden;
   }
+  .imported.live { border-left-color: #2e8b57; }
   .imported.hide { display: none; }
   .imported > summary {
     cursor: pointer; padding: .7rem 1rem; font-weight: bold; color: var(--accent);
@@ -109,12 +135,11 @@
   .imported .ro-table td.cast-cell { color: var(--gold); text-align: center; white-space: nowrap; }
   .imported .ro-table tr.cast td { opacity: .6; }
 
-
   footer.legal { text-align: center; font-size: .75rem; opacity: .6; margin-top: 2rem; }
 
   @media print {
     body { background: #fff; padding: 0; }
-    .gm-toolbar, .btn, .filter-row, .site-nav, .secret { display: none; }
+    .gm-toolbar, .btn, .filter-row, .site-nav, .secret, .room-bar { display: none; }
     .imported { break-inside: avoid; }
     .imported[open] > summary::before, .imported > summary::before { display: none; }
   }
@@ -142,15 +167,46 @@
     keep this screen to yourself.
   </div>
 
-  <p class="toolbar-note">Import each player's exported <code>.json</code> spellsheet (from the Spellsheet page), or a previously saved set. You can select several files at once. Imported sheets are read-only and saved in this browser, so your library is here next session.</p>
+  <!-- Room: receive pushed spellsheets live -->
+  <div class="room-bar" id="roomBar">
+    <span class="status" id="roomStatus"><span class="dot"></span>Not in a room</span>
+    <span class="spacer"></span>
+    <span class="join-only">
+      <button class="btn small" id="createRoomBtn">Create room</button>
+      <input id="joinInput" placeholder="Room code" maxlength="12">
+      <button class="btn small" id="joinRoomBtn">Join</button>
+    </span>
+    <span class="in-room-only">
+      <button class="btn small" id="copyLinkBtn">Copy invite</button>
+      <button class="btn small" id="leaveRoomBtn">Leave</button>
+    </span>
+  </div>
+
+  <!-- Live, pushed from players -->
+  <div id="roomSection" style="display:none">
+    <div class="section-head">
+      <h2>From the room (live)</h2>
+      <span class="count" id="roomCount"></span>
+    </div>
+    <p class="section-note">Players who <strong>Push to GM</strong> from the Spellsheet appear here automatically &mdash; no files needed. Updates as they push.</p>
+    <div id="roomSheets"></div>
+    <p class="empty" id="roomEmpty">No spellsheets pushed yet. Share the room code with your players.</p>
+  </div>
+
+  <!-- Imported from files -->
+  <div class="section-head">
+    <h2>Imported files</h2>
+    <span class="count" id="libCount"></span>
+    <span class="spacer"></span>
+  </div>
+  <p class="section-note">Or import each player's exported <code>.json</code> spellsheet (or a saved set). Several at once is fine. Saved in this browser.</p>
 
   <div class="gm-toolbar">
     <button class="btn" id="importBtn">Import sheets&hellip;</button>
     <input type="file" id="importInput" accept=".json,application/json" multiple hidden>
     <button class="btn" id="exportAllBtn">Export all as set &#8595;</button>
-    <button class="btn" id="clearLibBtn">Clear library</button>
+    <button class="btn" id="clearLibBtn">Clear imported</button>
     <button class="btn" onclick="window.print()">Print</button>
-    <span class="lib-count" id="libCount"></span>
   </div>
 
   <div class="filter-row" id="filterRow" style="display:none">
@@ -158,7 +214,7 @@
   </div>
 
   <div id="library"></div>
-  <p class="gm-empty" id="libEmpty">No spellsheets imported yet. Click <strong>Import sheets…</strong> to load the players' exported files.</p>
+  <p class="empty" id="libEmpty">No spellsheets imported yet. Click <strong>Import sheets…</strong> to load the players' exported files.</p>
 
   <footer class="legal">
     Based on <em>Thieves of the Tome Core Rules v1.0</em>, Ch. 2 (Tomecraft).
@@ -167,144 +223,222 @@
   </footer>
 </div>
 
-<script>
-(function () {
-  const LIB_KEY = "tott-spellsheet-library";
-  const libraryEl = document.getElementById("library");
-  let library = [];
+<script type="module">
+const SUPABASE_URL = "https://wbrfqsxsfcfijphlaiye.supabase.co";
+const SUPABASE_KEY = "sb_publishable_xN88kgc3CLZJGIiAKK03cw_VAVSICqS";
+const LIB_KEY  = "tott-spellsheet-library";
+const ROOM_KEY = "tott-room";
 
-  function safeName(s) {
-    return (s || "set").trim().replace(/[^\w\-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "set";
+let sb = null;
+try {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  if (SUPABASE_URL && SUPABASE_KEY) sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch (e) { console.warn("Supabase unavailable — live push disabled.", e); }
+
+let room = null, channel = null;
+let library = [];      // imported-from-file sheets
+let roomSheets = [];   // pushed-from-room sheets
+
+const libraryEl = document.getElementById("library");
+const roomEl = document.getElementById("roomSheets");
+
+function safeName(s) { return (s || "set").trim().replace(/[^\w\-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "set"; }
+function download(filename, obj) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function flashBtn(b, msg) {
+  const old = b.dataset.label || b.textContent; b.dataset.label = old;
+  b.textContent = msg; setTimeout(() => b.textContent = b.dataset.label, 1100);
+}
+
+// ---- shared read-only card ----
+function makeSheetCard(sheet, opts) {
+  opts = opts || {};
+  const det = document.createElement("details");
+  det.className = "imported" + (opts.live ? " live" : "");
+  det.dataset.search = ((sheet.tomeTitle || "") + " " + (sheet.byline || "") + " " +
+    (sheet.spells || []).map(s => s.name).join(" ")).toLowerCase();
+
+  const sum = document.createElement("summary");
+  const title = document.createElement("span");
+  title.textContent = sheet.tomeTitle || "(untitled Tome)";
+  const meta = document.createElement("span");
+  meta.className = "meta";
+  const cast = (sheet.spells || []).filter(s => s.starred).length;
+  meta.textContent = (sheet.byline ? sheet.byline + " · " : "") +
+    (sheet.spells ? sheet.spells.length : 0) + " spells" + (cast ? " · " + cast + " cast" : "");
+  sum.append(title, meta);
+  if (opts.onRemove) {
+    const rm = document.createElement("button");
+    rm.className = "rm"; rm.type = "button"; rm.textContent = "Remove";
+    rm.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); opts.onRemove(); });
+    sum.append(rm);
   }
-  function download(filename, obj) {
-    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-  function saveLibrary() { localStorage.setItem(LIB_KEY, JSON.stringify(library)); }
+  det.appendChild(sum);
 
-  function renderLibrary() {
-    libraryEl.innerHTML = "";
-    library.forEach((sheet, i) => {
-      const det = document.createElement("details");
-      det.className = "imported";
-      det.dataset.search = ((sheet.tomeTitle || "") + " " +
-        (sheet.spells || []).map(s => s.name).join(" ")).toLowerCase();
-
-      const sum = document.createElement("summary");
-      const title = document.createElement("span");
-      title.textContent = sheet.tomeTitle || "(untitled Tome)";
-      const meta = document.createElement("span");
-      meta.className = "meta";
-      const cast = (sheet.spells || []).filter(s => s.starred).length;
-      meta.textContent = (sheet.spells ? sheet.spells.length : 0) + " spells" + (cast ? " · " + cast + " cast" : "");
-      const rm = document.createElement("button");
-      rm.className = "rm"; rm.type = "button"; rm.textContent = "Remove";
-      rm.addEventListener("click", (e) => {
-        e.preventDefault(); e.stopPropagation();
-        library.splice(i, 1); saveLibrary(); renderLibrary();
-      });
-      sum.append(title, meta, rm);
-      det.appendChild(sum);
-
-      const table = document.createElement("table");
-      table.className = "ro-table";
-      const thead = document.createElement("thead");
-      thead.innerHTML = "<tr><th>#</th><th>Name</th><th>Choice</th><th>Effect</th><th>Cast</th></tr>";
-      table.appendChild(thead);
-      const tb = document.createElement("tbody");
-      (sheet.spells || []).forEach((sp, n) => {
-        const tr = document.createElement("tr");
-        if (sp.starred) tr.className = "cast";
-        const cells = [String(n + 1), sp.name || "", sp.choice || "", sp.effect || ""];
-        cells.forEach(txt => { const td = document.createElement("td"); td.textContent = txt; tr.appendChild(td); });
-        const c = document.createElement("td"); c.className = "cast-cell"; c.textContent = sp.starred ? "★" : ""; tr.appendChild(c);
-        tb.appendChild(tr);
-      });
-      table.appendChild(tb);
-      det.appendChild(table);
-      libraryEl.appendChild(det);
+  const table = document.createElement("table"); table.className = "ro-table";
+  const thead = document.createElement("thead");
+  thead.innerHTML = "<tr><th>#</th><th>Name</th><th>Choice</th><th>Effect</th><th>Cast</th></tr>";
+  table.appendChild(thead);
+  const tb = document.createElement("tbody");
+  (sheet.spells || []).forEach((sp, n) => {
+    const tr = document.createElement("tr");
+    if (sp.starred) tr.className = "cast";
+    [String(n + 1), sp.name || "", sp.choice || "", sp.effect || ""].forEach(txt => {
+      const td = document.createElement("td"); td.textContent = txt; tr.appendChild(td);
     });
-
-    document.getElementById("libEmpty").style.display = library.length ? "none" : "";
-    document.getElementById("filterRow").style.display = library.length > 1 ? "" : "none";
-    document.getElementById("libCount").textContent =
-      library.length ? library.length + " sheet" + (library.length === 1 ? "" : "s") + " loaded" : "";
-    applyFilter();
-  }
-
-  function applyFilter() {
-    const q = (document.getElementById("filter").value || "").trim().toLowerCase();
-    [...libraryEl.children].forEach(det => {
-      det.classList.toggle("hide", q && !det.dataset.search.includes(q));
-    });
-  }
-  document.getElementById("filter").addEventListener("input", applyFilter);
-
-  function extractSheets(obj) {
-    if (!obj || typeof obj !== "object") return [];
-    if (Array.isArray(obj.sheets)) return obj.sheets.filter(s => s && Array.isArray(s.spells));
-    if (Array.isArray(obj.spells)) return [{ tomeTitle: obj.tomeTitle || "", spells: obj.spells }];
-    if (Array.isArray(obj)) return obj.filter(s => s && Array.isArray(s.spells));
-    return [];
-  }
-
-  function flashBtn(b, msg) {
-    const old = b.dataset.label || b.textContent;
-    b.dataset.label = old; b.textContent = msg;
-    setTimeout(() => b.textContent = b.dataset.label, 1100);
-  }
-
-  document.getElementById("importBtn").addEventListener("click", () =>
-    document.getElementById("importInput").click());
-
-  document.getElementById("importInput").addEventListener("change", (e) => {
-    const files = [...e.target.files];
-    let added = 0, bad = 0, pending = files.length;
-    if (!pending) return;
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const sheets = extractSheets(JSON.parse(reader.result));
-          if (sheets.length) { library.push(...sheets); added += sheets.length; }
-          else bad++;
-        } catch (err) { bad++; }
-        if (--pending === 0) finishImport(added, bad);
-      };
-      reader.onerror = () => { bad++; if (--pending === 0) finishImport(added, bad); };
-      reader.readAsText(file);
-    });
-    e.target.value = "";
+    const c = document.createElement("td"); c.className = "cast-cell"; c.textContent = sp.starred ? "★" : ""; tr.appendChild(c);
+    tb.appendChild(tr);
   });
+  table.appendChild(tb); det.appendChild(table);
+  return det;
+}
 
-  function finishImport(added, bad) {
-    saveLibrary(); renderLibrary();
-    let msg = added + " imported";
-    if (bad) msg += ", " + bad + " skipped";
-    flashBtn(document.getElementById("importBtn"), msg);
-    if (bad && !added) alert("No valid spellsheets found in the selected file(s).");
+// ---- imported-file library ----
+function saveLibrary() { localStorage.setItem(LIB_KEY, JSON.stringify(library)); }
+function renderLibrary() {
+  libraryEl.innerHTML = "";
+  library.forEach((sheet, i) => {
+    libraryEl.appendChild(makeSheetCard(sheet, { onRemove: () => { library.splice(i, 1); saveLibrary(); renderLibrary(); } }));
+  });
+  document.getElementById("libEmpty").style.display = library.length ? "none" : "";
+  document.getElementById("libCount").textContent =
+    library.length ? library.length + " file" + (library.length === 1 ? "" : "s") : "";
+  updateFilterRow(); applyFilter();
+}
+
+// ---- live room library ----
+function renderRoomSheets() {
+  roomEl.innerHTML = "";
+  roomSheets.forEach(sheet => roomEl.appendChild(makeSheetCard(sheet, { live: true })));
+  document.getElementById("roomEmpty").style.display = roomSheets.length ? "none" : "";
+  document.getElementById("roomCount").textContent =
+    roomSheets.length ? roomSheets.length + " pushed" : "";
+  updateFilterRow(); applyFilter();
+}
+
+async function refreshRoomSheets() {
+  if (!inRoom()) { roomSheets = []; renderRoomSheets(); return; }
+  const { data, error } = await sb.from("room_spellsheets").select("*").eq("room", room).order("updated_at");
+  if (error) return;
+  roomSheets = data.map(r => ({ tomeTitle: r.tome_title, byline: "by " + r.player, spells: r.spells || [] }));
+  renderRoomSheets();
+}
+
+// ---- filter across both sections ----
+function totalSheets() { return library.length + roomSheets.length; }
+function updateFilterRow() { document.getElementById("filterRow").style.display = totalSheets() > 1 ? "" : "none"; }
+function applyFilter() {
+  const q = (document.getElementById("filter").value || "").trim().toLowerCase();
+  document.querySelectorAll(".imported").forEach(det => det.classList.toggle("hide", q && !det.dataset.search.includes(q)));
+}
+document.getElementById("filter").addEventListener("input", applyFilter);
+
+// ---- file import ----
+function extractSheets(obj) {
+  if (!obj || typeof obj !== "object") return [];
+  if (Array.isArray(obj.sheets)) return obj.sheets.filter(s => s && Array.isArray(s.spells));
+  if (Array.isArray(obj.spells)) return [{ tomeTitle: obj.tomeTitle || "", spells: obj.spells }];
+  if (Array.isArray(obj)) return obj.filter(s => s && Array.isArray(s.spells));
+  return [];
+}
+document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importInput").click());
+document.getElementById("importInput").addEventListener("change", (e) => {
+  const files = [...e.target.files];
+  let added = 0, bad = 0, pending = files.length;
+  if (!pending) return;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try { const sheets = extractSheets(JSON.parse(reader.result)); if (sheets.length) { library.push(...sheets); added += sheets.length; } else bad++; }
+      catch (err) { bad++; }
+      if (--pending === 0) finishImport(added, bad);
+    };
+    reader.onerror = () => { bad++; if (--pending === 0) finishImport(added, bad); };
+    reader.readAsText(file);
+  });
+  e.target.value = "";
+});
+function finishImport(added, bad) {
+  saveLibrary(); renderLibrary();
+  let msg = added + " imported"; if (bad) msg += ", " + bad + " skipped";
+  flashBtn(document.getElementById("importBtn"), msg);
+  if (bad && !added) alert("No valid spellsheets found in the selected file(s).");
+}
+document.getElementById("exportAllBtn").addEventListener("click", () => {
+  const all = [...library, ...roomSheets];
+  if (!all.length) { flashBtn(document.getElementById("exportAllBtn"), "Nothing to export"); return; }
+  download("tott_spellsheet_set.json", { type: "tott-spellsheet-set", version: 1, sheets: all.map(s => ({ tomeTitle: s.tomeTitle, spells: s.spells })) });
+  flashBtn(document.getElementById("exportAllBtn"), "Exported set");
+});
+document.getElementById("clearLibBtn").addEventListener("click", () => {
+  if (!library.length) return;
+  if (confirm("Remove all imported (file) spellsheets?")) { library = []; saveLibrary(); renderLibrary(); }
+});
+
+// ---- room ----
+function inRoom() { return !!(room && sb); }
+function genCode() {
+  const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = "";
+  for (let i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)];
+  return "THIEF-" + s;
+}
+function updateRoomBar() {
+  const bar = document.getElementById("roomBar");
+  if (room) {
+    bar.classList.add("in-room");
+    document.getElementById("roomStatus").innerHTML = '<span class="dot"></span>Room <b>' + room + '</b> &mdash; receiving pushes';
+    document.getElementById("roomSection").style.display = "";
+  } else {
+    bar.classList.remove("in-room");
+    document.getElementById("roomStatus").innerHTML = '<span class="dot"></span>Not in a room';
+    document.getElementById("roomSection").style.display = "none";
   }
+}
+function subscribe() {
+  if (channel) { sb.removeChannel(channel); channel = null; }
+  if (!inRoom()) return;
+  channel = sb.channel("gmlib-" + room)
+    .on("postgres_changes", { event: "*", schema: "public", table: "room_spellsheets", filter: "room=eq." + room }, () => refreshRoomSheets())
+    .subscribe();
+}
+async function joinRoom(code) {
+  if (!sb) return;
+  room = String(code).toUpperCase().trim();
+  localStorage.setItem(ROOM_KEY, room);
+  history.replaceState(null, "", "#room=" + room);
+  updateRoomBar(); subscribe();
+  await refreshRoomSheets();
+}
+function leaveRoom() {
+  if (channel) { sb.removeChannel(channel); channel = null; }
+  room = null; localStorage.removeItem(ROOM_KEY);
+  history.replaceState(null, "", location.pathname);
+  updateRoomBar(); refreshRoomSheets();
+}
+document.getElementById("createRoomBtn").addEventListener("click", () => joinRoom(genCode()));
+document.getElementById("joinRoomBtn").addEventListener("click", () => {
+  const c = document.getElementById("joinInput").value.trim();
+  if (c) { document.getElementById("joinInput").value = ""; joinRoom(c); }
+});
+document.getElementById("joinInput").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("joinRoomBtn").click(); });
+document.getElementById("leaveRoomBtn").addEventListener("click", leaveRoom);
+document.getElementById("copyLinkBtn").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(location.href); flashBtn(document.getElementById("copyLinkBtn"), "Copied"); }
+  catch (e) { flashBtn(document.getElementById("copyLinkBtn"), "Copy failed"); }
+});
+if (!sb) { ["createRoomBtn", "joinRoomBtn", "joinInput"].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; }); }
 
-  document.getElementById("exportAllBtn").addEventListener("click", () => {
-    if (!library.length) { flashBtn(document.getElementById("exportAllBtn"), "Library empty"); return; }
-    download("tott_spellsheet_set.json", { type: "tott-spellsheet-set", version: 1, sheets: library });
-    flashBtn(document.getElementById("exportAllBtn"), "Exported set");
-  });
-
-  document.getElementById("clearLibBtn").addEventListener("click", () => {
-    if (!library.length) return;
-    if (confirm("Remove all imported spellsheets from the GM library?")) {
-      library = []; saveLibrary(); renderLibrary();
-    }
-  });
-
-  try { const lr = localStorage.getItem(LIB_KEY); if (lr) library = JSON.parse(lr) || []; } catch (e) { library = []; }
-  renderLibrary();
-})();
+// ---- init ----
+try { const lr = localStorage.getItem(LIB_KEY); if (lr) library = JSON.parse(lr) || []; } catch (e) { library = []; }
+renderLibrary();
+const hashMatch = location.hash.match(/room=([A-Za-z0-9\-]+)/);
+const startRoom = hashMatch ? hashMatch[1] : localStorage.getItem(ROOM_KEY);
+if (startRoom && sb) joinRoom(startRoom); else { updateRoomBar(); renderRoomSheets(); }
 </script>
 </body>
 </html>
