@@ -3,7 +3,8 @@
 -- ============================================================================
 -- Run this in the Supabase dashboard → SQL Editor. It is safe to re-run:
 -- every statement is idempotent. Sections 1–4 set up the synced Tome pile,
--- section 5 the shared Tomeality, and section 6 the automatic cleanup.
+-- section 5 the shared Tomeality, section 6 the pushed spellsheets, and
+-- section 7 the automatic cleanup.
 --
 -- The publishable (anon) key in the app is protected by the Row Level Security
 -- policies below — room codes are the only access control, and no personal data
@@ -107,7 +108,51 @@ begin
 end $$;
 
 -- ============================================================================
--- 6. Automatic cleanup of stale rooms (every hour, drop rooms idle >24h) ------
+-- 6. Pushed spellsheets: players send their sheet to the GM without files -----
+-- ============================================================================
+-- One row per player per room. NOTE: like the other tables, this is gated only
+-- by the (unguessable) room code with no logins, so a determined player in the
+-- room could read effects directly. Acceptable for a trusting table; if you
+-- need effects kept truly secret, that would require client-side encryption.
+create table if not exists public.room_spellsheets (
+  room       text not null,
+  player     text not null,
+  tome_title text,
+  spells     jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now(),
+  primary key (room, player)
+);
+
+alter table public.room_spellsheets enable row level security;
+
+drop policy if exists "room_spellsheets select" on public.room_spellsheets;
+drop policy if exists "room_spellsheets insert" on public.room_spellsheets;
+drop policy if exists "room_spellsheets update" on public.room_spellsheets;
+drop policy if exists "room_spellsheets delete" on public.room_spellsheets;
+
+create policy "room_spellsheets select" on public.room_spellsheets
+  for select to anon, authenticated using (true);
+create policy "room_spellsheets insert" on public.room_spellsheets
+  for insert to anon, authenticated with check (true);
+create policy "room_spellsheets update" on public.room_spellsheets
+  for update to anon, authenticated using (true) with check (true);
+create policy "room_spellsheets delete" on public.room_spellsheets
+  for delete to anon, authenticated using (true);
+
+grant select, insert, update, delete on public.room_spellsheets to anon, authenticated;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'room_spellsheets'
+  ) then
+    execute 'alter publication supabase_realtime add table public.room_spellsheets';
+  end if;
+end $$;
+
+-- ============================================================================
+-- 7. Automatic cleanup of stale rooms (every hour, drop rooms idle >24h) ------
 -- ============================================================================
 -- Requires the pg_cron extension. On Supabase you can also enable it via
 -- Database → Extensions → "pg_cron". The create extension below is allowlisted.
@@ -126,6 +171,8 @@ as $$
     having max(created_at) < now() - interval '24 hours'
   );
   delete from public.room_tomeality
+  where updated_at < now() - interval '24 hours';
+  delete from public.room_spellsheets
   where updated_at < now() - interval '24 hours';
 $$;
 

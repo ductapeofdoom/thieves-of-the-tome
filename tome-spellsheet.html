@@ -67,6 +67,35 @@
     padding: .35rem .9rem; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: .9rem;
   }
   .btn:hover { background: var(--accent); color: var(--parchment); }
+  .btn.small { padding: .25rem .6rem; font-size: .8rem; border-width: 1px; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn:disabled:hover { background: var(--parchment); color: var(--accent); }
+
+  .room-bar {
+    display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
+    background: rgba(58,74,107,.07); border: 1px solid var(--accent-soft);
+    border-radius: 10px; padding: .6rem .8rem; margin-bottom: .5rem;
+  }
+  .room-bar .status { font-size: .9rem; display: flex; align-items: center; }
+  .room-bar .status b { color: var(--accent); letter-spacing: 1px; }
+  .room-bar .dot { width: .6rem; height: .6rem; border-radius: 50%; background: #9a9a9a; display: inline-block; margin-right: .45rem; }
+  .room-bar.in-room .dot { background: #2e8b57; box-shadow: 0 0 5px #2e8b57; }
+  .room-bar .spacer { flex: 1; }
+  .room-bar input {
+    font-family: inherit; font-size: .9rem; border: 1.5px solid var(--line); border-radius: 6px;
+    padding: .3rem .5rem; background: var(--parchment); color: var(--ink); outline: none;
+  }
+  .room-bar input:focus { border-color: var(--accent); background: #fffdf6; }
+  .room-bar .identity { display: inline-flex; align-items: center; gap: .35rem; }
+  .room-bar .identity label { font-size: .85rem; font-weight: bold; opacity: .8; }
+  .room-bar .identity input { width: 8rem; }
+  .room-bar #joinInput { width: 8rem; text-transform: uppercase; letter-spacing: 1px; }
+  .room-bar .join-only { display: inline-flex; gap: .5rem; align-items: center; }
+  .room-bar .in-room-only { display: none; gap: .5rem; align-items: center; }
+  .room-bar.in-room .join-only { display: none; }
+  .room-bar.in-room .in-room-only { display: inline-flex; }
+  .push-status { font-size: .82rem; opacity: .85; margin-bottom: 1.25rem; min-height: 1.1rem; }
+  .push-status a { color: var(--accent); }
 
   .tome-row { display: grid; grid-template-columns: 130px 1fr; gap: .4rem .75rem; align-items: center; margin-bottom: 1.25rem; }
   .tome-row label { font-weight: bold; }
@@ -130,7 +159,7 @@
 
   @media print {
     body { background: #fff; padding: 0; }
-    .toolbar, .btn, .add-row, .site-nav, .gm-link { display: none; }
+    .toolbar, .btn, .add-row, .site-nav, .gm-link, .room-bar, .push-status { display: none; }
     .spell { break-inside: avoid; }
     input, textarea { background: #fff; }
     .secret { background: #fff; }
@@ -177,6 +206,24 @@
     <button class="btn" onclick="window.print()">Print</button>
   </div>
 
+  <div class="room-bar" id="roomBar">
+    <span class="status" id="roomStatus"><span class="dot"></span>Not in a room</span>
+    <span class="spacer"></span>
+    <span class="identity">
+      <label for="nameInput">You:</label>
+      <input id="nameInput" placeholder="Your name" maxlength="24" autocomplete="off">
+    </span>
+    <span class="join-only">
+      <input id="joinInput" placeholder="Room code" maxlength="12">
+      <button class="btn small" id="joinRoomBtn">Join room</button>
+    </span>
+    <span class="in-room-only">
+      <button class="btn small" id="pushBtn">Push to GM</button>
+      <button class="btn small" id="leaveRoomBtn">Leave</button>
+    </span>
+  </div>
+  <div class="push-status" id="pushStatus"></div>
+
   <div class="tome-row">
     <label for="tomeTitle">Tome Title</label>
     <input type="text" id="tomeTitle" placeholder="The book you brought to the table">
@@ -210,12 +257,24 @@
   </footer>
 </div>
 
-<script>
-(function () {
-  const STORAGE_KEY = "tott-spellsheet";
-  const MIN_SPELLS = 6;
-  const spellsEl = document.getElementById("spells");
-  let tomeUrl = "";
+<script type="module">
+const STORAGE_KEY = "tott-spellsheet";
+const ROOM_KEY = "tott-room";
+const PLAYER_KEY = "tott-player";
+const SUPABASE_URL = "https://wbrfqsxsfcfijphlaiye.supabase.co";
+const SUPABASE_KEY = "sb_publishable_xN88kgc3CLZJGIiAKK03cw_VAVSICqS";
+const MIN_SPELLS = 6;
+const spellsEl = document.getElementById("spells");
+let tomeUrl = "";
+
+// Load Supabase (optional — push disables gracefully if it can't load)
+let sb = null;
+try {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  if (SUPABASE_URL && SUPABASE_KEY) sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch (e) { console.warn("Supabase unavailable — push disabled.", e); }
+let room = null;
+let playerName = (localStorage.getItem(PLAYER_KEY) || "").trim();
 
   function renderTomeLink() {
     const a = document.getElementById("tomeLink");
@@ -349,7 +408,79 @@
       flash("Tome set from The Table");
     }
   } catch (e) {}
-})();
+
+  // ---------- room push ----------
+  const nameInput = document.getElementById("nameInput");
+  nameInput.value = playerName;
+  nameInput.addEventListener("input", () => {
+    playerName = nameInput.value.trim();
+    if (playerName) localStorage.setItem(PLAYER_KEY, playerName); else localStorage.removeItem(PLAYER_KEY);
+  });
+
+  function inRoom() { return !!(room && sb); }
+  function setPushStatus(html) { document.getElementById("pushStatus").innerHTML = html || ""; wireUnpush(); }
+  function wireUnpush() {
+    const u = document.getElementById("unpush");
+    if (u) u.addEventListener("click", async (e) => {
+      e.preventDefault();
+      if (!inRoom() || !playerName) return;
+      await sb.from("room_spellsheets").delete().eq("room", room).eq("player", playerName);
+      setPushStatus("Removed from the GM's library.");
+    });
+  }
+  function updateRoomBar() {
+    const bar = document.getElementById("roomBar");
+    if (room) {
+      bar.classList.add("in-room");
+      document.getElementById("roomStatus").innerHTML = '<span class="dot"></span>Room <b>' + room + '</b>';
+    } else {
+      bar.classList.remove("in-room");
+      document.getElementById("roomStatus").innerHTML = '<span class="dot"></span>Not in a room';
+      setPushStatus("");
+    }
+  }
+  function joinRoom(code) {
+    if (!sb) { setPushStatus("Push unavailable (couldn’t load Supabase)."); return; }
+    room = String(code).toUpperCase().trim();
+    localStorage.setItem(ROOM_KEY, room);
+    history.replaceState(null, "", "#room=" + room);
+    updateRoomBar();
+    setPushStatus('Joined room <b>' + room + '</b>. Click <b>Push to GM</b> to send your spells.');
+  }
+  function leaveRoom() {
+    room = null; localStorage.removeItem(ROOM_KEY);
+    history.replaceState(null, "", location.pathname);
+    updateRoomBar();
+  }
+  async function pushToGM() {
+    if (!inRoom()) { setPushStatus("Join a room first (ask your GM for the code)."); return; }
+    if (!playerName) {
+      const entered = prompt("Enter your name (so the GM knows whose sheet this is):");
+      if (entered === null) return;
+      playerName = (entered || "").trim();
+      if (!playerName) { setPushStatus("Enter your name in the “You:” box first."); nameInput.focus(); return; }
+      nameInput.value = playerName; localStorage.setItem(PLAYER_KEY, playerName);
+    }
+    const sheet = serialize();
+    const { error } = await sb.from("room_spellsheets").upsert({
+      room, player: playerName, tome_title: sheet.tomeTitle, spells: sheet.spells, updated_at: new Date().toISOString()
+    });
+    if (error) { setPushStatus("Push failed: " + error.message); return; }
+    setPushStatus('Pushed to the GM &#10003; &mdash; re-push after edits. <a href="#" id="unpush">Remove from GM</a>');
+    flash("Pushed");
+  }
+  document.getElementById("joinRoomBtn").addEventListener("click", () => {
+    const c = document.getElementById("joinInput").value.trim();
+    if (c) { document.getElementById("joinInput").value = ""; joinRoom(c); }
+  });
+  document.getElementById("joinInput").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("joinRoomBtn").click(); });
+  document.getElementById("leaveRoomBtn").addEventListener("click", leaveRoom);
+  document.getElementById("pushBtn").addEventListener("click", pushToGM);
+  if (!sb) { ["joinRoomBtn", "joinInput", "pushBtn"].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; }); }
+
+  const hashMatch = location.hash.match(/room=([A-Za-z0-9\-]+)/);
+  const startRoom = hashMatch ? hashMatch[1] : localStorage.getItem(ROOM_KEY);
+  if (startRoom && sb) joinRoom(startRoom); else updateRoomBar();
 </script>
 </body>
 </html>
