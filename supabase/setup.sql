@@ -152,13 +152,13 @@ begin
 end $$;
 
 -- ============================================================================
--- 7. Automatic cleanup of stale rooms (every hour, drop rooms idle >24h) ------
+-- 7. Automatic cleanup of stale rooms (hourly check, drop rooms idle >1 month) -
 -- ============================================================================
 -- Requires the pg_cron extension. On Supabase you can also enable it via
 -- Database → Extensions → "pg_cron". The create extension below is allowlisted.
 create extension if not exists pg_cron;
 
--- Delete whole rooms whose most recent activity is older than 24 hours.
+-- Delete whole rooms whose most recent activity is older than 1 month.
 -- (Keyed on the room's newest row so an in-progress room is never split.)
 create or replace function public.purge_old_table_books() returns void
 language sql
@@ -168,12 +168,12 @@ as $$
     select room
     from public.table_books
     group by room
-    having max(created_at) < now() - interval '24 hours'
+    having max(created_at) < now() - interval '1 month'
   );
   delete from public.room_tomeality
-  where updated_at < now() - interval '24 hours';
+  where updated_at < now() - interval '1 month';
   delete from public.room_spellsheets
-  where updated_at < now() - interval '24 hours';
+  where updated_at < now() - interval '1 month';
 $$;
 
 -- (Re)schedule the hourly job, replacing any existing one with this name.
