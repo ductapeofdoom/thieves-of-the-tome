@@ -21,9 +21,13 @@ create table if not exists public.table_books (
   cover        text,
   url          text,
   stolen_by    text,
+  spell_count  integer default 6,   -- the Tome's "bookmark": how many spells it holds
   created_at   timestamptz not null default now(),
   unique (room, gutenberg_id)
 );
+
+-- For databases created before spell_count existed:
+alter table public.table_books add column if not exists spell_count integer default 6;
 
 create index if not exists table_books_room_idx on public.table_books (room);
 

@@ -156,6 +156,21 @@
   .book .send a { font-size: .72rem; color: var(--accent); cursor: pointer; text-decoration: none; }
   .book .send a:hover { text-decoration: underline; }
 
+  .book .cover-wrap .bm-badge {
+    position: absolute; top: .4rem; left: .4rem; z-index: 2;
+    background: rgba(28,26,23,.78); color: var(--parchment);
+    font-size: .72rem; padding: .1rem .45rem; border-radius: 999px; white-space: nowrap;
+  }
+  .book .bookmark { display: flex; align-items: center; gap: .3rem; font-size: .8rem; color: var(--accent); }
+  .book .bookmark .bm-num { font-weight: bold; min-width: 1.1rem; text-align: center; }
+  .book .bookmark .bm-label { opacity: .7; }
+  .book .bm-btn {
+    width: 1.3rem; height: 1.3rem; line-height: 1; padding: 0;
+    border: 1px solid var(--accent-soft); background: var(--parchment); color: var(--accent);
+    border-radius: 4px; cursor: pointer; font-family: inherit; font-size: .95rem;
+  }
+  .book .bm-btn:hover { background: var(--accent); color: var(--parchment); }
+
   .book.stolen { opacity: .92; }
   .book.stolen .cover-wrap img, .book.stolen .cover-fallback { filter: grayscale(.7) brightness(.8); }
   .book .ribbon {
@@ -178,7 +193,7 @@
 
   @media print {
     body { background: #fff; padding: 0; }
-    .site-nav, .add-panel, .room-bar, .btn, .rm { display: none; }
+    .site-nav, .add-panel, .room-bar, .btn, .rm, .bm-btn { display: none; }
   }
 </style>
 </head>
@@ -329,6 +344,7 @@ function parseId(input) {
   m = s.match(/\b(\d{1,7})\b/);
   return m ? +m[1] : null;
 }
+const DEFAULT_SPELLS = 6;  // the rulebook minimum
 function bookFromGutendex(b) {
   return {
     gutenberg_id: b.id,
@@ -336,7 +352,8 @@ function bookFromGutendex(b) {
     author: (b.authors && b.authors[0] && b.authors[0].name) || "Unknown",
     cover: (b.formats && b.formats["image/jpeg"]) || "",
     url: "https://www.gutenberg.org/ebooks/" + b.id,
-    stolenBy: null
+    stolenBy: null,
+    spellCount: DEFAULT_SPELLS
   };
 }
 async function fetchByIds(ids) {
@@ -352,7 +369,7 @@ async function refresh() {
   if (inRoom()) {
     const { data, error } = await sb.from("table_books").select("*").eq("room", room).order("created_at");
     if (error) { setMsg("Sync error: " + error.message, true); return; }
-    table = data.map(r => ({ gutenberg_id: r.gutenberg_id, title: r.title, author: r.author, cover: r.cover, url: r.url, stolenBy: r.stolen_by }));
+    table = data.map(r => ({ gutenberg_id: r.gutenberg_id, title: r.title, author: r.author, cover: r.cover, url: r.url, stolenBy: r.stolen_by, spellCount: (r.spell_count == null ? DEFAULT_SPELLS : r.spell_count) }));
   } else {
     try { table = JSON.parse(localStorage.getItem(LOCAL_KEY)) || []; } catch (e) { table = []; }
   }
@@ -363,7 +380,8 @@ async function opAdd(book) {
   if (table.some(t => t.gutenberg_id === book.gutenberg_id)) return { dup: true };
   if (inRoom()) {
     const { error } = await sb.from("table_books").insert({
-      room, gutenberg_id: book.gutenberg_id, title: book.title, author: book.author, cover: book.cover, url: book.url
+      room, gutenberg_id: book.gutenberg_id, title: book.title, author: book.author, cover: book.cover, url: book.url,
+      spell_count: book.spellCount == null ? DEFAULT_SPELLS : book.spellCount
     });
     if (error && error.code !== "23505") return { error };  // 23505 = duplicate, ignore
     await refresh();
@@ -399,6 +417,15 @@ async function opClear() {
     if (error) { setMsg("Sync error: " + error.message, true); return; }
     await refresh();
   } else { table = []; saveLocal(); render(); }
+}
+async function opSetSpellCount(book, n) {
+  n = Math.max(1, Math.min(99, n | 0));
+  book.spellCount = n; // optimistic
+  if (inRoom()) {
+    const { error } = await sb.from("table_books").update({ spell_count: n }).eq("room", room).eq("gutenberg_id", book.gutenberg_id);
+    if (error) { setMsg("Sync error: " + error.message, true); return; }
+    await refresh();
+  } else { saveLocal(); render(); }
 }
 
 // ---------- add flows ----------
@@ -502,12 +529,24 @@ function render() {
       img.addEventListener("error", () => { cw.innerHTML = ""; cw.appendChild(fallback(bk.title)); });
       cw.appendChild(img);
     } else { cw.appendChild(fallback(bk.title)); }
+    const cnt = bk.spellCount == null ? DEFAULT_SPELLS : bk.spellCount;
+    const badge = document.createElement("div"); badge.className = "bm-badge"; badge.title = "Spells in this Tome"; badge.textContent = "🔖 " + cnt;
+    cw.appendChild(badge);
     card.appendChild(cw);
 
     const body = document.createElement("div"); body.className = "body";
     const t = document.createElement("div"); t.className = "b-title"; t.textContent = bk.title;
     const a = document.createElement("div"); a.className = "b-auth"; a.textContent = bk.author;
-    body.append(t, a);
+
+    const bm = document.createElement("div"); bm.className = "bookmark"; bm.title = "How many spells this Tome holds — set it after writing spells";
+    const minus = document.createElement("button"); minus.type = "button"; minus.className = "bm-btn"; minus.textContent = "−";
+    const num = document.createElement("span"); num.className = "bm-num"; num.textContent = cnt;
+    const lbl = document.createElement("span"); lbl.className = "bm-label"; lbl.textContent = "spells";
+    const plus = document.createElement("button"); plus.type = "button"; plus.className = "bm-btn"; plus.textContent = "+";
+    minus.addEventListener("click", () => { const n = Math.max(1, (bk.spellCount == null ? DEFAULT_SPELLS : bk.spellCount) - 1); num.textContent = n; badge.textContent = "🔖 " + n; opSetSpellCount(bk, n); });
+    plus.addEventListener("click", () => { const n = Math.min(99, (bk.spellCount == null ? DEFAULT_SPELLS : bk.spellCount) + 1); num.textContent = n; badge.textContent = "🔖 " + n; opSetSpellCount(bk, n); });
+    bm.append(minus, num, lbl, plus);
+    body.append(t, a, bm);
 
     const actions = document.createElement("div"); actions.className = "b-actions";
     const read = document.createElement("a");
@@ -542,7 +581,7 @@ function render() {
     const send = document.createElement("div"); send.className = "send";
     const toSpell = document.createElement("a");
     toSpell.textContent = "Write spells →"; toSpell.title = "Open the Spellsheet with this Tome's title filled in";
-    toSpell.addEventListener("click", () => handoff("spell", { title: bk.title, url: bk.url }));
+    toSpell.addEventListener("click", () => handoff("spell", { title: bk.title, url: bk.url, id: bk.gutenberg_id }));
     const toThief = document.createElement("a");
     toThief.textContent = "Build thief →"; toThief.title = "Open the Thief Sheet with this stolen Tome and its author filled in";
     toThief.addEventListener("click", () => handoff("thief", { title: bk.title, author: bk.author, url: bk.url }));
