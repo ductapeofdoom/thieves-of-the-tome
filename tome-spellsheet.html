@@ -266,6 +266,7 @@ const SUPABASE_KEY = "sb_publishable_xN88kgc3CLZJGIiAKK03cw_VAVSICqS";
 const MIN_SPELLS = 6;
 const spellsEl = document.getElementById("spells");
 let tomeUrl = "";
+let tomeBookId = null;   // Gutenberg id of the linked book on The Table (for the bookmark)
 
 // Load Supabase (optional — push disables gracefully if it can't load)
 let sb = null;
@@ -326,6 +327,7 @@ let playerName = (localStorage.getItem(PLAYER_KEY) || "").trim();
     return {
       tomeTitle: document.getElementById("tomeTitle").value,
       tomeUrl,
+      tomeBookId,
       spells: [...spellsEl.children].map(r => ({
         name: r.querySelector(".f-name").value,
         choice: r.querySelector(".f-choice").value,
@@ -339,6 +341,7 @@ let playerName = (localStorage.getItem(PLAYER_KEY) || "").trim();
     if (!d) return;
     document.getElementById("tomeTitle").value = d.tomeTitle || "";
     tomeUrl = d.tomeUrl || ""; renderTomeLink();
+    tomeBookId = (d.tomeBookId == null ? null : d.tomeBookId);
     spellsEl.innerHTML = "";
     const list = (d.spells && d.spells.length) ? d.spells : [];
     const n = Math.max(MIN_SPELLS, list.length);
@@ -347,9 +350,10 @@ let playerName = (localStorage.getItem(PLAYER_KEY) || "").trim();
 
   document.getElementById("addBtn").addEventListener("click", () => makeSpell());
 
-  document.getElementById("saveBtn").addEventListener("click", () => {
+  document.getElementById("saveBtn").addEventListener("click", async () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize()));
-    flash("Saved");
+    const n = await syncBookmark();
+    flash(n ? "Saved · 🔖 " + n : "Saved");
   });
   document.getElementById("loadBtn").addEventListener("click", () => {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -358,7 +362,7 @@ let playerName = (localStorage.getItem(PLAYER_KEY) || "").trim();
   document.getElementById("clearBtn").addEventListener("click", () => {
     if (confirm("Clear the whole spellsheet?")) {
       document.getElementById("tomeTitle").value = "";
-      tomeUrl = ""; renderTomeLink();
+      tomeUrl = ""; renderTomeLink(); tomeBookId = null;
       spellsEl.innerHTML = "";
       for (let i = 0; i < MIN_SPELLS; i++) makeSpell();
     }
@@ -404,6 +408,7 @@ let playerName = (localStorage.getItem(PLAYER_KEY) || "").trim();
       const d = JSON.parse(h);
       if (d && d.title) document.getElementById("tomeTitle").value = d.title;
       if (d && d.url) { tomeUrl = d.url; renderTomeLink(); }
+      if (d && d.id != null) tomeBookId = d.id;
       localStorage.removeItem("tott-handoff-spell");
       flash("Tome set from The Table");
     }
@@ -466,8 +471,25 @@ let playerName = (localStorage.getItem(PLAYER_KEY) || "").trim();
       room, player: playerName, tome_title: sheet.tomeTitle, spells: sheet.spells, updated_at: new Date().toISOString()
     });
     if (error) { setPushStatus("Push failed: " + error.message); return; }
-    setPushStatus('Pushed to the GM &#10003; &mdash; re-push after edits. <a href="#" id="unpush">Remove from GM</a>');
+    const bm = await syncBookmark();
+    setPushStatus('Pushed to the GM &#10003;' + (bm ? ' &middot; bookmarked ' + bm + ' spells on The Table' : '') +
+      ' &mdash; re-push after edits. <a href="#" id="unpush">Remove from GM</a>');
     flash("Pushed");
+  }
+
+  // Count spells that have a name (the chapter title defines a spell)
+  function countSpells() {
+    return [...spellsEl.children].filter(r => r.querySelector(".f-name").value.trim()).length;
+  }
+  // Auto-fill the linked book's bookmark on The Table with this sheet's spell count
+  async function syncBookmark() {
+    if (!sb || !room || tomeBookId == null) return null;
+    const n = countSpells();
+    if (n < 1) return null;
+    const { data, error } = await sb.from("table_books")
+      .update({ spell_count: n }).eq("room", room).eq("gutenberg_id", tomeBookId).select("gutenberg_id");
+    if (error || !data || !data.length) return null;
+    return n;
   }
   document.getElementById("joinRoomBtn").addEventListener("click", () => {
     const c = document.getElementById("joinInput").value.trim();
