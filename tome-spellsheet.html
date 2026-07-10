@@ -504,5 +504,6 @@ let playerName = (localStorage.getItem(PLAYER_KEY) || "").trim();
   const startRoom = hashMatch ? hashMatch[1] : localStorage.getItem(ROOM_KEY);
   if (startRoom && sb) joinRoom(startRoom); else updateRoomBar();
 </script>
+<script src="dice.js"></script>
 </body>
 </html>

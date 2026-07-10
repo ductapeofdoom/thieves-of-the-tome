@@ -440,5 +440,6 @@ const hashMatch = location.hash.match(/room=([A-Za-z0-9\-]+)/);
 const startRoom = hashMatch ? hashMatch[1] : localStorage.getItem(ROOM_KEY);
 if (startRoom && sb) joinRoom(startRoom); else { updateRoomBar(); renderRoomSheets(); }
 </script>
+<script src="dice.js"></script>
 </body>
 </html>
